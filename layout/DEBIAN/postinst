@@ -1,0 +1,15 @@
+#!/bin/sh
+# Avalanche: settings and icon map live in the jailbreak root so sandboxed processes (iconservicesagent) can read them.
+JB=/var/jb
+[ -d "$JB" ] || JB=""
+
+mkdir -p "$JB/var/mobile/Library/Avalanche"
+chown -R mobile:mobile "$JB/var/mobile/Library/Avalanche" 2>/dev/null
+chmod 0755 "$JB/var/mobile/Library/Avalanche"
+mkdir -p "$JB/Library/Themes"
+
+# let iconservicesagent start over with the tweak loaded
+killall -9 iconservicesagent 2>/dev/null
+
+uicache -p "$JB/Applications/Avalanche.app" 2>/dev/null || uicache 2>/dev/null
+exit 0
