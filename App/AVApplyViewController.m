@@ -6,7 +6,7 @@
   BOOL _clearIconCache;
   BOOL _springBoardAnswered;
   int _progressToken;
-  UIImageView *_snowflake;
+  UIImageView *_symbol;
   UILabel *_titleLabel;
   UILabel *_statusLabel;
   UIProgressView *_progressView;
@@ -34,8 +34,8 @@
   [super viewDidLoad];
   self.view.backgroundColor = [UIColor systemBackgroundColor];
 
-  _snowflake = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"snowflake" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:52 weight:UIImageSymbolWeightMedium]]];
-  _snowflake.tintColor = self.view.tintColor;
+  _symbol = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.triangle.2.circlepath" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:52 weight:UIImageSymbolWeightMedium]]];
+  _symbol.tintColor = self.view.tintColor;
 
   _titleLabel = [UILabel new];
   _titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
@@ -60,11 +60,11 @@
   }]];
   _closeButton.hidden = YES;
 
-  UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[_snowflake, _titleLabel, _progressView, _statusLabel, _closeButton]];
+  UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[_symbol, _titleLabel, _progressView, _statusLabel, _closeButton]];
   stack.axis = UILayoutConstraintAxisVertical;
   stack.alignment = UIStackViewAlignmentCenter;
   stack.spacing = 16;
-  [stack setCustomSpacing:24 afterView:_snowflake];
+  [stack setCustomSpacing:24 afterView:_symbol];
   stack.translatesAutoresizingMaskIntoConstraints = NO;
   [self.view addSubview:stack];
   [NSLayoutConstraint activateConstraints:@[
@@ -84,7 +84,7 @@
   spin.toValue = @(M_PI * 2);
   spin.duration = 3;
   spin.repeatCount = HUGE_VALF;
-  [_snowflake.layer addAnimation:spin forKey:@"spin"];
+  [_symbol.layer addAnimation:spin forKey:@"spin"];
 
   // SpringBoard reports (done << 32) | total while it renders the theme icons, done == UINT32_MAX before respringing
   __weak typeof(self) weakSelf = self;
@@ -114,9 +114,9 @@
 
 - (void)showFailureIfSpringBoardIsSilent {
   if (_springBoardAnswered) return;
-  [_snowflake.layer removeAllAnimations];
-  _snowflake.image = [UIImage systemImageNamed:@"exclamationmark.triangle.fill" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:52 weight:UIImageSymbolWeightMedium]];
-  _snowflake.tintColor = [UIColor systemOrangeColor];
+  [_symbol.layer removeAllAnimations];
+  _symbol.image = [UIImage systemImageNamed:@"exclamationmark.triangle.fill" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:52 weight:UIImageSymbolWeightMedium]];
+  _symbol.tintColor = [UIColor systemOrangeColor];
   _progressView.hidden = YES;
   _statusLabel.text = AVLocalized(@"SpringBoard didn't answer. Make sure Avalanche is enabled in your tweak injector, respring once and try again.");
   _closeButton.hidden = NO;

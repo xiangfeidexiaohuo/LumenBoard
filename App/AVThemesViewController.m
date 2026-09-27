@@ -62,7 +62,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   __weak typeof(self) weakSelf = self;
   UIButtonConfiguration *configuration = [UIButtonConfiguration filledButtonConfiguration];
   configuration.title = AVLocalized(@"Apply");
-  configuration.image = [UIImage systemImageNamed:@"snowflake"];
+  configuration.image = [UIImage systemImageNamed:@"square.grid.2x2"];
   configuration.imagePadding = 8;
   configuration.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
   configuration.buttonSize = UIButtonConfigurationSizeLarge;
@@ -161,7 +161,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
     self.tableView.backgroundView = nil;
     return;
   }
-  UIImageView *image = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"snowflake" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:48 weight:UIImageSymbolWeightLight]]];
+  UIImageView *image = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"square.grid.2x2" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:48 weight:UIImageSymbolWeightLight]]];
   image.tintColor = [UIColor tertiaryLabelColor];
   UILabel *title = [UILabel new];
   title.text = AVLocalized(@"No themes installed");
