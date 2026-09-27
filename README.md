@@ -1,46 +1,61 @@
-# LumenBoard
+<p align="center">
+  <img src="App/Resources/AppIcon60x60@3x.png" width="96" alt="LumenBoard icon">
+</p>
 
-Icon theme engine for iOS 17 - 26. Works with SnowBoard, Anemone and WinterBoard themes.
+<h1 align="center">LumenBoard</h1>
 
-Supports rootless (Dopamine, palera1n) and roothide (Relaxin, Bootstrap, Dopamine-roothide).
+<p align="center">
+  Icon theme engine for iOS 17 - 26<br>
+  Works with SnowBoard, Anemone and WinterBoard themes
+</p>
+
+---
 
 ## Features
 
-- themes every app icon: home screen, dock, App Library, Spotlight, Settings, notifications, share sheet
-- icons are rendered before the respring, so nothing pops in afterwards
-- multiple themes, drag them in the order you want
-- theme icons keep their own shape, or use the iOS shape
-- dark and tinted icons on iOS 18 (`-dark.png` / `-tinted.png`)
-- app in English and German
+- Themes every app icon: home screen, dock, App Library, Spotlight, Settings, notifications
+- Icons are rendered before the respring, nothing pops in afterwards
+- Use several themes at once and drag them into the order you like
+- Theme icons keep their own shape, or use the iOS shape
+- Dark and tinted icons on iOS 18
+- App in English and German
+
+## Supported jailbreaks
+
+| Type | Jailbreaks | Package |
+| --- | --- | --- |
+| rootless | Dopamine, palera1n | `iphoneos-arm64` |
+| roothide | Relaxin, Bootstrap, Dopamine-roothide | `iphoneos-arm64e` |
 
 ## Install
 
-Get the .deb for your jailbreak from Releases:
+1. Download the .deb for your jailbreak from [Releases](../../releases/latest)
+2. Install it with Sileo, Zebra or Filza
+3. Put your themes in `/Library/Themes` (rootless: `/var/jb/Library/Themes`)
+4. Open LumenBoard, turn on your themes and tap **Apply**
 
-- rootless: `com.xsxs18.lumenboard_<version>_iphoneos-arm64.deb`
-- roothide: `com.xsxs18.lumenboard_<version>_iphoneos-arm64e.deb`
+> Don't use it together with SnowBoard, Anemone or NeonBoard. Themes that need SnowBoard or Anemone install fine.
 
-Install themes (rootless: `/var/jb/Library/Themes`, roothide: `/Library/Themes` in the jbroot), open LumenBoard,
-enable them and tap Apply.
-
-Don't install it together with SnowBoard, Anemone or NeonBoard. Themes that depend on SnowBoard or Anemone install
-fine, LumenBoard provides both.
-
-## Themes
+## Theme format
 
 ```
-<Theme>.theme/IconBundles/<bundle id>[-large][-dark|-tinted][@2x|@3x][~iphone|~ipad].png
-<Theme>.theme/Icons/<App Name>.png
+MyTheme.theme/
+├── IconBundles/
+│   ├── com.apple.mobilesafari-large.png
+│   ├── com.apple.mobilesafari-dark.png     (optional)
+│   └── com.apple.mobilesafari-tinted.png   (optional)
+└── Icons/
+    └── Safari.png                          (by app name)
 ```
 
 ## Building
 
 ```sh
-make package                                   # rootless
-make package THEOS_PACKAGE_SCHEME=roothide     # roothide, needs roothide/theos
+make package                                 # rootless
+make package THEOS_PACKAGE_SCHEME=roothide   # roothide, needs roothide/theos
 ```
 
-Logos has to be on a623700, newer versions break lines that continue after `%orig`.
+Logos needs to be on `a623700`, newer versions break lines that continue after `%orig`.
 
 ## License
 
