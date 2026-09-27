@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>application-identifier</key>
-	<string>com.xsxs18.Lumen</string>
+	<string>com.xsxs18.LumenBoard</string>
 	<key>platform-application</key>
 	<true/>
 	<key>com.apple.private.security.no-container</key>

@@ -118,7 +118,7 @@
   _symbol.image = [UIImage systemImageNamed:@"exclamationmark.triangle.fill" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:52 weight:UIImageSymbolWeightMedium]];
   _symbol.tintColor = [UIColor systemOrangeColor];
   _progressView.hidden = YES;
-  _statusLabel.text = LMLocalized(@"SpringBoard didn't answer. Make sure Lumen is enabled in your tweak injector, respring once and try again.");
+  _statusLabel.text = LMLocalized(@"SpringBoard didn't answer. Make sure LumenBoard is enabled in your tweak injector, respring once and try again.");
   _closeButton.hidden = NO;
   self.modalInPresentation = NO;
 }

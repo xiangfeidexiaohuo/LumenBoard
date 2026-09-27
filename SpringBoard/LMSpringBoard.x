@@ -152,7 +152,7 @@ static BOOL LMWriteIconMap(void) {
   [[NSFileManager defaultManager] createDirectoryAtPath:LMDataDirectory withIntermediateDirectories:YES attributes:nil error:nil];
   NSData *data = [NSPropertyListSerialization dataWithPropertyList:map format:NSPropertyListBinaryFormat_v1_0 options:0 error:nil];
   if (![data writeToFile:LMIconMapPath options:NSDataWritingAtomic error:nil]) {
-    NSLog(@"[Lumen] can't write %@", LMIconMapPath);
+    NSLog(@"[LumenBoard] can't write %@", LMIconMapPath);
     return NO;
   }
   chmod(LMIconMapPath.fileSystemRepresentation, 0644);
@@ -262,7 +262,7 @@ static void LMRespring(void) {
   Class relaunchAction = objc_getClass("SBSRelaunchAction");
   Class systemService = objc_getClass("FBSSystemService");
   if (relaunchAction && systemService) {
-    id action = [relaunchAction actionWithReason:@"LumenApply" options:4 targetURL:nil]; // 4: restart render server
+    id action = [relaunchAction actionWithReason:@"LumenBoardApply" options:4 targetURL:nil]; // 4: restart render server
     [[systemService sharedService] sendActions:[NSSet setWithObject:action] withResult:nil];
     return;
   }

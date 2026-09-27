@@ -71,7 +71,7 @@ static NSUUID *LMThemedDigest(NSUUID *stockDigest, NSString *token) {
   NSData *tokenData = [token dataUsingEncoding:NSUTF8StringEncoding];
   CC_SHA256_CTX context;
   CC_SHA256_Init(&context);
-  CC_SHA256_Update(&context, "lumen-theme-icon", 16);
+  CC_SHA256_Update(&context, "lumenboard-theme-icon", 21);
   CC_SHA256_Update(&context, bytes, sizeof(bytes));
   CC_SHA256_Update(&context, tokenData.bytes, (CC_LONG)tokenData.length);
   unsigned char hash[CC_SHA256_DIGEST_LENGTH];

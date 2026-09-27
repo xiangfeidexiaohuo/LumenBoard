@@ -10,8 +10,8 @@ else
 fi
 
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
-  rm -f "$JB/var/mobile/Library/Lumen/IconMap.plist"
-  [ "$1" = "purge" ] && rm -rf "$JB/var/mobile/Library/Lumen"
+  rm -f "$JB/var/mobile/Library/LumenBoard/IconMap.plist"
+  [ "$1" = "purge" ] && rm -rf "$JB/var/mobile/Library/LumenBoard"
   # drop the cached theme icons
   rm -rf "$ROOTFS/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches/com.apple.IconsCache"
   rm -rf "$ROOTFS/var/mobile/Library/Caches/com.apple.IconsCache"

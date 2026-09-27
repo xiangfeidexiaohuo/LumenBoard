@@ -49,7 +49,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (void)viewDidLoad {
   [super viewDidLoad];
-  self.title = @"Lumen";
+  self.title = @"LumenBoard";
   _previews = [NSMutableDictionary new];
   _iconCounts = [NSMutableDictionary new];
   _loading = [NSMutableSet new];
@@ -120,7 +120,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
     [self updateApplyButton];
     return YES;
   }
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:[NSString stringWithFormat:LMLocalized(@"%@\n\nLumen has to be installed as a package (not as an IPA) so it can write its settings."), error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:[NSString stringWithFormat:LMLocalized(@"%@\n\nLumenBoard has to be installed as a package (not as an IPA) so it can write its settings."), error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
   [self presentViewController:alert animated:YES completion:nil];
   return NO;

@@ -40,15 +40,15 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 
 // Config.plist (app) and IconMap.plist (SpringBoard). Not in /var/mobile/Library/Preferences because
 // iconservicesagent is sandboxed and can only read from the jailbreak folder.
-#define LMDataDirectory LMRootPath(@"/var/mobile/Library/Lumen")
+#define LMDataDirectory LMRootPath(@"/var/mobile/Library/LumenBoard")
 #define LMConfigPath [LMDataDirectory stringByAppendingPathComponent:@"Config.plist"]
 #define LMIconMapPath [LMDataDirectory stringByAppendingPathComponent:@"IconMap.plist"]
 
-#define LMNotifyApply "com.xsxs18.lumen/apply"
-#define LMNotifyClearCache "com.xsxs18.lumen/clear-cache"
-#define LMNotifyMapChanged "com.xsxs18.lumen/map-changed"
+#define LMNotifyApply "com.xsxs18.lumenboard/apply"
+#define LMNotifyClearCache "com.xsxs18.lumenboard/clear-cache"
+#define LMNotifyMapChanged "com.xsxs18.lumenboard/map-changed"
 // state = (done << 32) | total, done == UINT32_MAX when SpringBoard is about to respring
-#define LMNotifyProgress "com.xsxs18.lumen/progress"
+#define LMNotifyProgress "com.xsxs18.lumenboard/progress"
 
 // Config.plist
 #define LMConfigEnabledThemes @"EnabledThemes" // theme folder names, first one wins

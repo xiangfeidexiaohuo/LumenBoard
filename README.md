@@ -1,4 +1,4 @@
-# Lumen
+# LumenBoard
 
 Icon theme engine for iOS 17 - 26. Works with SnowBoard, Anemone and WinterBoard themes.
 
@@ -17,14 +17,14 @@ Supports rootless (Dopamine, palera1n) and roothide (Relaxin, Bootstrap, Dopamin
 
 Get the .deb for your jailbreak from Releases:
 
-- rootless: `com.xsxs18.lumen_<version>_iphoneos-arm64.deb`
-- roothide: `com.xsxs18.lumen_<version>_iphoneos-arm64e.deb`
+- rootless: `com.xsxs18.lumenboard_<version>_iphoneos-arm64.deb`
+- roothide: `com.xsxs18.lumenboard_<version>_iphoneos-arm64e.deb`
 
-Install themes (rootless: `/var/jb/Library/Themes`, roothide: `/Library/Themes` in the jbroot), open Lumen,
+Install themes (rootless: `/var/jb/Library/Themes`, roothide: `/Library/Themes` in the jbroot), open LumenBoard,
 enable them and tap Apply.
 
 Don't install it together with SnowBoard, Anemone or NeonBoard. Themes that depend on SnowBoard or Anemone install
-fine, Lumen provides both.
+fine, LumenBoard provides both.
 
 ## Themes
 

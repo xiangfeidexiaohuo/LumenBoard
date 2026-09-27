@@ -1,8 +1,8 @@
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = LumenSpringBoard
-LumenSpringBoard_FILES = LMSpringBoard.x ../Shared/LMThemeLibrary.m
-LumenSpringBoard_CFLAGS = -fobjc-arc -Wall -Wno-deprecated-declarations
-LumenSpringBoard_FRAMEWORKS = UIKit
+TWEAK_NAME = LumenBoardSpringBoard
+LumenBoardSpringBoard_FILES = LMSpringBoard.x ../Shared/LMThemeLibrary.m
+LumenBoardSpringBoard_CFLAGS = -fobjc-arc -Wall -Wno-deprecated-declarations
+LumenBoardSpringBoard_FRAMEWORKS = UIKit
 
 include $(THEOS_MAKE_PATH)/tweak.mk
