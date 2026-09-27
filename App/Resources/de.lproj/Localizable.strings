@@ -17,7 +17,7 @@
 "About" = "Info";
 "iOS icon shape" = "iOS-Icon-Form";
 "Keep in dark & tinted mode" = "Im Dunkel- & Tönungsmodus behalten";
-"Theme icons keep their own shape and transparency unless \"iOS icon shape\" is on. \"Keep in dark & tinted mode\" shows them unchanged instead of letting iOS darken or tint them; themes can also ship -dark and -tinted icons. Tap Apply afterwards." = "Theme-Icons behalten ihre eigene Form und Transparenz, außer „iOS-Icon-Form“ ist an. „Im Dunkel- & Tönungsmodus behalten“ zeigt sie unverändert, statt sie von iOS abdunkeln oder tönen zu lassen; Themes können auch eigene -dark- und -tinted-Icons mitbringen. Danach auf „Anwenden“ tippen.";
+"Theme icons keep their own shape unless \"iOS icon shape\" is on. Tap Apply afterwards." = "Theme-Icons behalten ihre eigene Form, außer „iOS-Icon-Form“ ist an. Danach auf „Anwenden“ tippen.";
 "Clear icon cache & respring" = "Icon-Cache leeren & Respring";
 "Renders every app icon again. Use it if icons still look wrong after installing or updating themes." = "Rendert alle App-Icons neu. Hilft, wenn Icons nach dem Installieren oder Aktualisieren von Themes noch falsch aussehen.";
 "Clear icon cache?" = "Icon-Cache leeren?";

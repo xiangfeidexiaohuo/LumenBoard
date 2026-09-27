@@ -1,16 +1,5 @@
-// App icon theming for iOS 17 – 26.
-//
-// Every app icon on the system (home screen, App Library, Spotlight, Settings, notifications, share sheets) is an
-// IconServices icon: [[ISIcon alloc] initWithBundleIdentifier:] creates an ISBundleIdentifierIcon whose `digest` is the
-// key into the shared icon cache. On a cache miss iconservicesagent renders the icon: it asks the icon for a resource
-// provider and composites the provider's artwork with a recipe (ISiOSAppRecipe: plate, squircle mask, dark/tint effects).
-//
-// Avalanche:
-//  1. derives a different digest for themed icons in every process, from the stock digest and the icon's token.
-//     Themed icons live in their own cache entries: stock icons cached before can't show up, and once rendered a
-//     themed icon loads instantly. A new theme or setting changes the token, so nothing stale is ever reused.
-//  2. gives iconservicesagent a provider with the theme artwork when it renders such an icon.
-//  3. optionally renders theme icons with their own shape and transparency (a recipe without plate and mask).
+// Themed icons get their own digest (= icon cache key) in every process,
+// iconservicesagent renders them from the theme png.
 
 #import "AVIconStore.h"
 #import <objc/runtime.h>
@@ -142,7 +131,7 @@ static id AVImageBag(NSString *path) {
   return bag;
 }
 
-// AVThemeIconProvider -configureProviderFromDescriptor: picks the theme's dark/tinted artwork for those appearances
+// AVThemeIconProvider: use the theme's -dark / -tinted png if there is one
 static void AVProviderConfigure(ISResourceProvider *self, SEL _cmd, id descriptor) {
   NSDictionary *entry = objc_getAssociatedObject(self, &AVIconEntryKey);
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
@@ -157,12 +146,12 @@ static void AVProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
   ((void (*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&superclass, _cmd, descriptor);
 }
 
-// AVThemeIconRecipe: the iOS app icon recipe without the squircle mask...
+// AVThemeIconRecipe: app icon recipe without the mask
 static BOOL AVRecipeShouldApplyMask(id self, SEL _cmd) {
   return NO;
 }
 
-// ...and without the white (dark/tinted: black) plate iOS puts under every icon, which would fill transparent corners
+// and without the white/black plate behind the icon
 static id AVRecipePrimaryEffect(id self, SEL _cmd, id __autoreleasing *backgroundContent) {
   struct objc_super superclass = { self, class_getSuperclass(AVRecipeClass) };
   id effect = ((id (*)(struct objc_super *, SEL, id __autoreleasing *))objc_msgSendSuper)(&superclass, _cmd, backgroundContent);
@@ -178,21 +167,19 @@ static ISResourceProvider *AVMakeProvider(NSDictionary *entry) {
   objc_setAssociatedObject(provider, &AVIconEntryKey, entry, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
   AVIconStore *store = [AVIconStore sharedStore];
-  // 1 = app icon: sized and composited like any app icon, dark/tinted derived like for apps without such artwork
+  // 1 = app icon
   if ([provider respondsToSelector:@selector(setResourceType:)]) [provider setResourceType:1];
   if ([provider respondsToSelector:@selector(setAllowNonDefaultAppearances:)]) [provider setAllowNonDefaultAppearances:!store.keepsIconsInDarkAndTinted];
   if ([provider respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [provider setAllowAlterationsToResourceArt:YES];
-  // used for plain descriptors (SpringBoard, Settings...); explicit shapes (circles, app clips) keep Apple's recipe
+  // only used if the descriptor doesn't ask for a shape itself
   if (!store.usesSystemIconShape && AVRecipeClass && [provider respondsToSelector:@selector(setSuggestedRecipe:)]) [provider setSuggestedRecipe:[AVRecipeClass new]];
   return provider;
 }
 
-// Theme the icon only if the requesting process asked for the themed digest. A process without Avalanche asked for
-// the stock icon and must get it, otherwise the stock cache entry would end up holding the theme icon.
+// only for requests with the themed digest, a process without the tweak wants the stock icon
 static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSString *bundleIdentifier, ISConcreteIcon *(^themedTwin)(void)) {
   if (!bundleIdentifier) return nil;
-  // SpringBoard writes the map before anyone uses its tokens: with the newest map on disk we never know less than
-  // the process that asked, so a themed request is never answered with the stock icon.
+  // the requesting process may already use a newer map
   [[AVIconStore sharedStore] reloadIfMapChanged];
   NSDictionary *entry = [[AVIconStore sharedStore] iconForBundleIdentifier:bundleIdentifier];
   if (!entry) return nil;
@@ -213,7 +200,7 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
   return self;
 }
 
-// allowFallback is NO for -makeSymbolResourceProvider (the app's SF symbol), which stays stock
+// allowFallback NO = -makeSymbolResourceProvider, leave it alone
 - (id)_makeResourceProviderAllowIconResourceFallback:(BOOL)allowFallback {
   if (allowFallback) {
     NSString *bundleIdentifier = [self bundleIdentifier];
@@ -231,7 +218,7 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
 
 - (instancetype)initWithBundleURL:(NSURL *)url type:(NSString *)type tag:(NSString *)tag tagClass:(NSString *)tagClass {
   self = %orig;
-  // without a type or tag this is the bundle's app icon (same test as -[ISBundleIcon makeResourceProvider])
+  // no type/tag = the app icon of the bundle
   if (!type && !(tag && tagClass)) AVMarkThemed(self, AVBundleIdentifierForAppURL(url));
   return self;
 }
@@ -285,7 +272,7 @@ static void AVInstallIconHooks(void) {
   Class concreteIcon = objc_getClass("ISConcreteIcon");
   Class providerBase = objc_getClass("ISResourceProvider");
   if (!concreteIcon || !providerBase || !objc_getClass("ISBundleIdentifierIcon") || !objc_getClass("IFImage") || !objc_getClass("IFImageBag")) return;
-  // the digest is the cache key; without it themed and stock icons would share cache entries
+  // no _digest, no way to keep themed and stock icons apart
   Ivar digest = class_getInstanceVariable(concreteIcon, "_digest");
   if (!digest || ![providerBase instancesRespondToSelector:@selector(initWithResource:templateResource:)]) return;
   AVHooksInstalled = YES;
@@ -318,7 +305,7 @@ static void AVImageAdded(const struct mach_header *header, intptr_t slide) {
   if (AVHooksInstalled) return;
   Dl_info info;
   if (!dladdr(header, &info) || !info.dli_fname || !strstr(info.dli_fname, "/IconServices.framework/")) return;
-  // IconServices was loaded after us; its classes are usable once dyld is done with it
+  // IconServices got loaded after us
   dispatch_async(dispatch_get_main_queue(), ^{ AVInstallIconHooks(); });
 }
 

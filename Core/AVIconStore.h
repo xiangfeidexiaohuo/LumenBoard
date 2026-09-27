@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-// The icon map SpringBoard resolved from the enabled themes (IconMap.plist), loaded lazily and shared by all threads.
+// IconMap.plist, loaded on first use
 @interface AVIconStore : NSObject
 
 + (instancetype)sharedStore;

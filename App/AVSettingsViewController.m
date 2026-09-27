@@ -87,7 +87,7 @@ typedef NS_ENUM(NSInteger, AVSettingsSection) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   switch (section) {
-    case AVSettingsSectionIconStyle: return AVLocalized(@"Theme icons keep their own shape and transparency unless \"iOS icon shape\" is on. \"Keep in dark & tinted mode\" shows them unchanged instead of letting iOS darken or tint them; themes can also ship -dark and -tinted icons. Tap Apply afterwards.");
+    case AVSettingsSectionIconStyle: return AVLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Tap Apply afterwards.");
     case AVSettingsSectionIconCache: return AVLocalized(@"Renders every app icon again. Use it if icons still look wrong after installing or updating themes.");
   }
   return nil;
@@ -119,7 +119,7 @@ typedef NS_ENUM(NSInteger, AVSettingsSection) {
   } else {
     content = [UIListContentConfiguration subtitleCellConfiguration];
     content.text = AVLocalized(@"Themes folder");
-    content.secondaryText = AVThemesDirectory;
+    content.secondaryText = AVThemesDirectoryDisplayName;
     content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
   }
   cell.contentConfiguration = content;

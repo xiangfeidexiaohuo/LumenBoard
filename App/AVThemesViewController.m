@@ -167,7 +167,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   title.text = AVLocalized(@"No themes installed");
   title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleTitle3];
   UILabel *detail = [UILabel new];
-  detail.text = [NSString stringWithFormat:AVLocalized(@"Install themes from your package manager. They are stored in %@."), AVThemesDirectory];
+  detail.text = [NSString stringWithFormat:AVLocalized(@"Install themes from your package manager. They are stored in %@."), AVThemesDirectoryDisplayName];
   detail.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
   detail.textColor = [UIColor secondaryLabelColor];
   detail.numberOfLines = 0;

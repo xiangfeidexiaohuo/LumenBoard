@@ -1,5 +1,4 @@
-// SpringBoard side of Avalanche: turns Config.plist (written by the app) into IconMap.plist, which every process
-// reads, and handles "Apply": pre-render the theme icons into the system icon cache, then respring.
+// SpringBoard: builds IconMap.plist from Config.plist and handles Apply (pre-render icons, respring)
 
 #import "../Shared/AVThemeLibrary.h"
 #import <UIKit/UIKit.h>
@@ -58,7 +57,7 @@ static void AVRun(NSString *tool, NSArray<NSString *> *arguments) {
   }
 }
 
-// iconservicesagent renders the icons; a fresh one only knows the current map and has no decoded artwork cached
+// a fresh agent has the new map and no old artwork in memory
 static void AVRestartIconAgent(void) {
   AVRun(@"/usr/bin/killall", @[@"-9", @"iconservicesagent"]);
 }
@@ -87,7 +86,7 @@ static void AVReloadStoreInThisProcess(void) {
 
 #pragma mark - Icon map
 
-// lowercased app name -> lowercased bundle ids, only needed for WinterBoard style "Icons/<App Name>.png" themes
+// app name -> bundle ids, for Icons/<App Name>.png
 static NSDictionary *AVInstalledAppNames(void) {
   NSMutableDictionary *names = [NSMutableDictionary new];
   for (LSApplicationProxy *app in [[objc_getClass("LSApplicationWorkspace") defaultWorkspace] allInstalledApplications]) {
@@ -99,7 +98,7 @@ static NSDictionary *AVInstalledAppNames(void) {
   return names;
 }
 
-// Resolves the enabled themes into IconMap.plist. Returns YES if the map changed.
+// YES if the map changed
 static BOOL AVWriteIconMap(void) {
   NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:AVConfigPath] ? : @{};
   NSArray *themes = [config[AVConfigEnabledThemes] isKindOfClass:[NSArray class]] ? config[AVConfigEnabledThemes] : @[];
@@ -113,15 +112,20 @@ static BOOL AVWriteIconMap(void) {
 
   NSDictionary *appliedConfig = @{ AVConfigEnabledThemes : themes, AVConfigUseSystemIconShape : @(systemShape), AVConfigKeepIconsInDarkAndTinted : @(keepAppearance) };
 
-  // everything that changes how an icon renders: its files and the icon style settings
+  // hash everything that changes how an icon looks. Paths are saved as jailbreak paths (roothide renames the jbroot).
   NSString *style = [NSString stringWithFormat:@"v%d shape=%d keep=%d", AVMapVersion, systemShape, keepAppearance];
-  NSMutableDictionary *materials = [NSMutableDictionary new];
+  NSMutableDictionary *entries = [NSMutableDictionary new], *materials = [NSMutableDictionary new];
   NSMutableString *content = [NSMutableString stringWithFormat:@"%@\n%@\n", style, [themes componentsJoinedByString:@"/"]];
   for (NSString *bundleID in [icons.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
     NSDictionary *icon = icons[bundleID];
-    NSString *material = [NSString stringWithFormat:@"%@|%@@%@|%@@%@|%@@%@|%@", bundleID,
-      icon[AVIconLight], AVFileStamp(icon[AVIconLight]), icon[AVIconDark] ? : @"", AVFileStamp(icon[AVIconDark]),
-      icon[AVIconTinted] ? : @"", AVFileStamp(icon[AVIconTinted]), style];
+    NSMutableDictionary *entry = [NSMutableDictionary new];
+    NSMutableString *material = [bundleID mutableCopy];
+    for (NSString *slot in @[AVIconLight, AVIconDark, AVIconTinted]) {
+      if (icon[slot]) entry[slot] = AVJailbreakPath(icon[slot]);
+      [material appendFormat:@"|%@@%@", entry[slot] ? : @"", AVFileStamp(icon[slot])];
+    }
+    [material appendFormat:@"|%@", style];
+    entries[bundleID] = entry;
     materials[bundleID] = material;
     [content appendFormat:@"%@\n", material];
   }
@@ -130,14 +134,10 @@ static BOOL AVWriteIconMap(void) {
   NSDictionary *previous = [NSDictionary dictionaryWithContentsOfFile:AVIconMapPath];
   if ([previous[@"Version"] integerValue] == AVMapVersion && [previous[@"ContentHash"] isEqual:contentHash]) return NO;
 
-  // A new generation on every change: tokens (and so icon cache keys) never repeat, a cache entry written while
-  // processes were switching over is never picked up again later.
+  // new generation on every change, so tokens (icon cache keys) are never reused
   NSString *generation = [NSUUID UUID].UUIDString;
-  NSMutableDictionary *mapIcons = [NSMutableDictionary dictionaryWithCapacity:icons.count];
-  [icons enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *icon, BOOL *stop) {
-    NSMutableDictionary *entry = [icon mutableCopy];
+  [entries enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSMutableDictionary *entry, BOOL *stop) {
     entry[AVIconToken] = AVHash([materials[bundleID] stringByAppendingFormat:@"|%@", generation]);
-    mapIcons[bundleID] = entry;
   }];
   NSDictionary *map = @{
     @"Version" : @(AVMapVersion),
@@ -146,7 +146,7 @@ static BOOL AVWriteIconMap(void) {
     AVConfigUseSystemIconShape : @(systemShape),
     AVConfigKeepIconsInDarkAndTinted : @(keepAppearance),
     AVMapAppliedConfig : appliedConfig,
-    AVMapIcons : mapIcons
+    AVMapIcons : entries
   };
 
   [[NSFileManager defaultManager] createDirectoryAtPath:AVDataDirectory withIntermediateDirectories:YES attributes:nil error:nil];
@@ -182,8 +182,7 @@ static void AVClearSystemIconCache(void) {
   ]) [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
 
-// The image descriptors SpringBoard uses for home screen icons (masked and unmasked), so the pre-rendered icons are
-// exactly the cache entries it asks for after the respring. Main thread only (UIScreen).
+// the descriptors SpringBoard uses for home screen icons, main thread only
 static NSArray *AVHomeScreenDescriptors(void) {
   BOOL pad = [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad;
   CGFloat longestSide = MAX([UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
@@ -206,7 +205,7 @@ static NSArray *AVHomeScreenDescriptors(void) {
   return descriptors;
 }
 
-// Installed apps whose icon changes: themed now, themed differently, or back to stock. nil maps = every app.
+// apps whose icon changed, nil maps = all apps
 static NSArray<NSString *> *AVAppsToRender(NSDictionary *before, NSDictionary *after) {
   NSMutableArray *bundleIDs = [NSMutableArray new];
   for (LSApplicationProxy *app in [[objc_getClass("LSApplicationWorkspace") defaultWorkspace] allInstalledApplications]) {
@@ -229,8 +228,7 @@ static BOOL AVIconIsCached(ISIcon *icon, NSArray *descriptors) {
   return YES;
 }
 
-// Asks iconservicesagent for every changed icon and waits until they're cached, like SnowBoard's icon cache rebuild:
-// after the respring the home screen shows the theme at once instead of icons popping in one by one.
+// render the icons now so they don't pop in one by one after the respring
 static void AVPrerenderIcons(NSArray<NSString *> *bundleIDs, NSArray *descriptors) {
   Class iconClass = objc_getClass("ISIcon");
   if (!descriptors.count || ![iconClass instancesRespondToSelector:@selector(prepareImagesForImageDescriptors:)] || ![iconClass instancesRespondToSelector:@selector(imageForDescriptor:)]) return;
@@ -246,7 +244,7 @@ static void AVPrerenderIcons(NSArray<NSString *> *bundleIDs, NSArray *descriptor
   uint32_t total = (uint32_t)pending.count, done = 0;
   AVReportProgress(0, total);
   CFAbsoluteTime start = CFAbsoluteTimeGetCurrent(), lastProgress = start;
-  // SpringBoard renders whatever is left on demand; don't hold the respring forever
+  // max 60s, or 10s without progress
   while (pending.count && CFAbsoluteTimeGetCurrent() - start < 60 && CFAbsoluteTimeGetCurrent() - lastProgress < 10) {
     usleep(150 * 1000);
     NSIndexSet *cached = [pending indexesOfObjectsPassingTest:^BOOL(ISIcon *icon, NSUInteger index, BOOL *stop) {
@@ -279,7 +277,7 @@ static void AVApply(BOOL clearCache) {
   NSDictionary *before = [NSDictionary dictionaryWithContentsOfFile:AVIconMapPath][AVMapIcons] ? : @{};
   if (clearCache) AVClearSystemIconCache();
   AVWriteIconMap();
-  // SpringBoard's own icons use the new tokens right away, everyone else reloads on the notification
+  // reload here now, the other processes get the notification
   AVReloadStoreInThisProcess();
   notify_post(AVNotifyMapChanged);
   NSArray *descriptors = AVHomeScreenDescriptors();
@@ -288,7 +286,7 @@ static void AVApply(BOOL clearCache) {
     AVRestartIconAgent();
     usleep(300 * 1000);
     NSDictionary *after = [NSDictionary dictionaryWithContentsOfFile:AVIconMapPath][AVMapIcons] ? : @{};
-    // after a cache wipe every icon has to be rendered again, not just the changed ones
+    // cache was wiped, render everything
     NSArray *apps = clearCache ? AVAppsToRender(nil, nil) : AVAppsToRender(before, after);
     AVPrerenderIcons(apps, descriptors);
     AVReportProgress(UINT32_MAX, UINT32_MAX);
@@ -304,7 +302,7 @@ static void AVApplyNotification(CFNotificationCenterRef center, void *observer, 
 %ctor {
   @autoreleasepool {
     if (![[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){17, 0, 0}]) return;
-    // themes can be installed or updated by the package manager without going through the app
+    // themes might have been updated by the package manager
     if (AVWriteIconMap()) {
       AVReloadStoreInThisProcess();
       AVRestartIconAgent();

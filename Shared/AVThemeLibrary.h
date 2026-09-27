@@ -15,8 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSDictionary<NSString *, NSDictionary *> *)iconsInTheme:(NSString *)theme;
 // same, keyed by lowercased app name ("Icons" folder)
 + (NSDictionary<NSString *, NSDictionary *> *)iconsByAppNameInTheme:(NSString *)theme;
-// The icon every app gets from the enabled themes: the first theme (highest priority) that has one wins,
-// IconBundles before Icons. appNames: lowercased app name -> lowercased bundle identifiers.
+// first theme wins, IconBundles before Icons. appNames: app name -> bundle ids
 + (NSDictionary<NSString *, NSDictionary *> *)resolvedIconsForThemes:(NSArray<NSString *> *)themes appNames:(nullable NSDictionary<NSString *, NSArray<NSString *> *> *)appNames;
 // forget cached folder listings (after themes were installed or removed)
 + (void)invalidate;

@@ -1,13 +1,20 @@
 #!/bin/sh
-# Avalanche: remove the generated icon map and drop cached theme icons.
-JB=/var/jb
-[ -d "$JB" ] || JB=""
+# roothide runs this inside the jbroot: no prefix for jailbreak paths, /rootfs for system paths
+if [ "$DPKG_MAINTSCRIPT_ARCH" = "iphoneos-arm64e" ]; then
+  JB=""
+  ROOTFS=/rootfs
+else
+  JB=/var/jb
+  [ -d "$JB" ] || JB=""
+  ROOTFS=""
+fi
 
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
   rm -f "$JB/var/mobile/Library/Avalanche/IconMap.plist"
   [ "$1" = "purge" ] && rm -rf "$JB/var/mobile/Library/Avalanche"
-  rm -rf /var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches/com.apple.IconsCache
-  rm -rf /var/mobile/Library/Caches/com.apple.IconsCache
+  # drop the cached theme icons
+  rm -rf "$ROOTFS/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches/com.apple.IconsCache"
+  rm -rf "$ROOTFS/var/mobile/Library/Caches/com.apple.IconsCache"
   killall -9 iconservicesagent 2>/dev/null
   uicache 2>/dev/null
 fi

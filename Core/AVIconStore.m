@@ -7,7 +7,7 @@
   NSDictionary *_icons;
   BOOL _usesSystemIconShape;
   BOOL _keepsIconsInDarkAndTinted;
-  // identity of the IconMap.plist that was read (it's replaced atomically, so the inode changes too)
+  // mtime and inode of the map we loaded
   struct timespec _mapModified;
   ino_t _mapInode;
   CFAbsoluteTime _lastCheck;
@@ -36,8 +36,7 @@ static void AVMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
   return self;
 }
 
-// Everything is read under one lock: IconServices renders many icons in parallel and none of them may see a half
-// loaded map (a stock icon would end up cached under a themed key).
+// IconServices renders on several threads, everything goes through _lock
 - (void)loadIfNeeded {
   if (_loaded) return;
   struct stat info;
@@ -47,14 +46,22 @@ static void AVMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
   _lastCheck = CFAbsoluteTimeGetCurrent();
   NSDictionary *map = exists ? [NSDictionary dictionaryWithContentsOfFile:AVIconMapPath] : nil;
   BOOL valid = [map[@"Version"] integerValue] == AVMapVersion && [map[AVMapIcons] isKindOfClass:[NSDictionary class]];
-  _icons = valid ? map[AVMapIcons] : @{};
+  // the map has jailbreak paths, turn them into real ones
+  NSMutableDictionary *icons = [NSMutableDictionary new];
+  if (valid) [map[AVMapIcons] enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *entry, BOOL *stop) {
+    if (![entry isKindOfClass:[NSDictionary class]]) return;
+    NSMutableDictionary *icon = [entry mutableCopy];
+    for (NSString *slot in @[AVIconLight, AVIconDark, AVIconTinted])
+      if ([entry[slot] isKindOfClass:[NSString class]]) icon[slot] = AVRootPath(entry[slot]);
+    icons[bundleID] = icon;
+  }];
+  _icons = icons;
   _usesSystemIconShape = valid && [map[AVConfigUseSystemIconShape] boolValue];
   _keepsIconsInDarkAndTinted = valid && [map[AVConfigKeepIconsInDarkAndTinted] boolValue];
   _loaded = YES;
 }
 
-// Called with the lock held. Processes can miss the darwin notification (suspended apps), so every process also
-// notices a new map on its own, at most once per second.
+// lock held. Suspended apps miss the notification, so check the file too
 - (void)checkMapWithinInterval:(CFTimeInterval)interval {
   if (!_loaded) return;
   CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
