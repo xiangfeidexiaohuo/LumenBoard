@@ -21,6 +21,16 @@ Written from scratch, it's not based on any other theme engine.
   an icon for an app wins.
 - **Home screen app** in English and German with theme previews and an icon cache reset.
 
+## Installing
+
+Every build of `main` is published under **Releases** as a plain `.deb` (one release per version, updated with each
+build). Install it with Sileo, Zebra, Filza or `dpkg -i`, put themes in `/var/jb/Library/Themes`, then open the
+**Avalanche** app, activate your themes and tap **Apply**.
+
+The package provides `com.spark.snowboard`, `com.anemonetheming.anemone` and `winterboard`, so themes that depend on
+one of them install against Avalanche. It conflicts with SnowBoard, Anemone, WinterBoard and NeonBoard, which would
+hook the same parts of IconServices.
+
 ## Theme formats
 
 ```

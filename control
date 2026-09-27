@@ -7,4 +7,6 @@ Maintainer: xsxs18-dev
 Author: xsxs18-dev
 Section: Tweaks
 Depends: mobilesubstrate, firmware (>= 17.0)
+Provides: com.spark.snowboard, com.anemonetheming.anemone, winterboard
+Conflicts: com.spark.snowboard, com.anemonetheming.anemone, winterboard, com.artikus.neonboard, com.xsxs18.neonboard
 Icon: file:///var/jb/Applications/Avalanche.app/AppIcon60x60@3x.png
