@@ -1,0 +1,25 @@
+name: Cleanup releases
+
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for t in $(gh release list --limit 100 --json tagName -q '.[].tagName'); do
+            gh release delete "$t" --yes --cleanup-tag
+          done
+          for t in $(git tag -l); do
+            git push origin ":refs/tags/$t" || true
+          done
+          gh release list
+          git ls-remote --tags origin
