@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="App/Resources/AppIcon60x60@3x.png" width="96" alt="LumenBoard icon">
+  <img src=".github/icon.png" width="120" alt="LumenBoard icon">
 </p>
 
 <h1 align="center">LumenBoard</h1>
