@@ -1,7 +1,7 @@
 // Themed icons get their own digest (= icon cache key) in every process,
 // iconservicesagent renders them from the theme png.
 
-#import "AVIconStore.h"
+#import "LMIconStore.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <mach-o/dyld.h>
@@ -55,23 +55,23 @@
 - (NSString *)bundleIdentifier;
 @end
 
-static BOOL AVHooksInstalled;
-static Ivar AVDigestIvar;
-static Class AVProviderClass;
-static Class AVRecipeClass;
-static NSCache *AVImageBags;
-static NSCache *AVAppURLIdentifiers;
-static char AVIconEntryKey;
+static BOOL LMHooksInstalled;
+static Ivar LMDigestIvar;
+static Class LMProviderClass;
+static Class LMRecipeClass;
+static NSCache *LMImageBags;
+static NSCache *LMAppURLIdentifiers;
+static char LMIconEntryKey;
 
 #pragma mark - Digests
 
-static NSUUID *AVThemedDigest(NSUUID *stockDigest, NSString *token) {
+static NSUUID *LMThemedDigest(NSUUID *stockDigest, NSString *token) {
   uuid_t bytes;
   [stockDigest getUUIDBytes:bytes];
   NSData *tokenData = [token dataUsingEncoding:NSUTF8StringEncoding];
   CC_SHA256_CTX context;
   CC_SHA256_Init(&context);
-  CC_SHA256_Update(&context, "avalanche-theme-icon", 20);
+  CC_SHA256_Update(&context, "lumen-theme-icon", 16);
   CC_SHA256_Update(&context, bytes, sizeof(bytes));
   CC_SHA256_Update(&context, tokenData.bytes, (CC_LONG)tokenData.length);
   unsigned char hash[CC_SHA256_DIGEST_LENGTH];
@@ -82,37 +82,37 @@ static NSUUID *AVThemedDigest(NSUUID *stockDigest, NSString *token) {
   return [[NSUUID alloc] initWithUUIDBytes:hash];
 }
 
-static void AVMarkThemed(ISConcreteIcon *icon, NSString *bundleIdentifier) {
+static void LMMarkThemed(ISConcreteIcon *icon, NSString *bundleIdentifier) {
   if (!icon) return;
-  NSDictionary *entry = [[AVIconStore sharedStore] iconForBundleIdentifier:bundleIdentifier];
+  NSDictionary *entry = [[LMIconStore sharedStore] iconForBundleIdentifier:bundleIdentifier];
   if (!entry) return;
-  id stockDigest = object_getIvar(icon, AVDigestIvar);
+  id stockDigest = object_getIvar(icon, LMDigestIvar);
   if (![stockDigest isKindOfClass:[NSUUID class]]) return;
-  object_setIvarWithStrongDefault(icon, AVDigestIvar, AVThemedDigest(stockDigest, entry[AVIconToken]));
+  object_setIvarWithStrongDefault(icon, LMDigestIvar, LMThemedDigest(stockDigest, entry[LMIconToken]));
 }
 
-static NSString *AVBundleIdentifierForAppURL(NSURL *url) {
+static NSString *LMBundleIdentifierForAppURL(NSURL *url) {
   if (!url.isFileURL || [url.pathExtension caseInsensitiveCompare:@"app"] != NSOrderedSame) return nil;
-  NSString *cached = [AVAppURLIdentifiers objectForKey:url.path];
+  NSString *cached = [LMAppURLIdentifiers objectForKey:url.path];
   if (cached) return cached.length ? cached : nil;
   NSString *bundleIdentifier = nil;
   Class recordClass = objc_getClass("LSApplicationRecord");
   if ([recordClass instancesRespondToSelector:@selector(initWithURL:allowPlaceholder:error:)])
     bundleIdentifier = [[[recordClass alloc] initWithURL:url allowPlaceholder:YES error:nil] bundleIdentifier];
   if (!bundleIdentifier) bundleIdentifier = [NSBundle bundleWithURL:url].bundleIdentifier;
-  [AVAppURLIdentifiers setObject:(bundleIdentifier ? : @"") forKey:url.path];
+  [LMAppURLIdentifiers setObject:(bundleIdentifier ? : @"") forKey:url.path];
   return bundleIdentifier;
 }
 
-static NSString *AVBundleIdentifierForIdentity(id identity) {
+static NSString *LMBundleIdentifierForIdentity(id identity) {
   return [identity respondsToSelector:@selector(bundleIdentifier)] ? [identity bundleIdentifier] : nil;
 }
 
 #pragma mark - Artwork
 
-static id AVImageBag(NSString *path) {
+static id LMImageBag(NSString *path) {
   if (!path.length) return nil;
-  id bag = [AVImageBags objectForKey:path];
+  id bag = [LMImageBags objectForKey:path];
   if (bag) return bag;
 
   CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path isDirectory:NO], NULL);
@@ -127,65 +127,65 @@ static id AVImageBag(NSString *path) {
   if (!artwork) return nil;
 
   bag = [[objc_getClass("IFImageBag") alloc] initWithImages:@[artwork]];
-  if (bag) [AVImageBags setObject:bag forKey:path];
+  if (bag) [LMImageBags setObject:bag forKey:path];
   return bag;
 }
 
-// AVThemeIconProvider: use the theme's -dark / -tinted png if there is one
-static void AVProviderConfigure(ISResourceProvider *self, SEL _cmd, id descriptor) {
-  NSDictionary *entry = objc_getAssociatedObject(self, &AVIconEntryKey);
+// LMThemeIconProvider: use the theme's -dark / -tinted png if there is one
+static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descriptor) {
+  NSDictionary *entry = objc_getAssociatedObject(self, &LMIconEntryKey);
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
-  NSString *variant = (appearance == 1) ? entry[AVIconDark] : ((appearance == 2) ? entry[AVIconTinted] : nil);
-  id bag = AVImageBag(variant);
+  NSString *variant = (appearance == 1) ? entry[LMIconDark] : ((appearance == 2) ? entry[LMIconTinted] : nil);
+  id bag = LMImageBag(variant);
   if (bag) {
     [self setIconResource:bag];
     // the theme drew this appearance itself, don't let iOS derive it again
     if ([self respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [self setAllowAlterationsToResourceArt:NO];
   }
-  struct objc_super superclass = { self, class_getSuperclass(AVProviderClass) };
+  struct objc_super superclass = { self, class_getSuperclass(LMProviderClass) };
   ((void (*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&superclass, _cmd, descriptor);
 }
 
-// AVThemeIconRecipe: app icon recipe without the mask
-static BOOL AVRecipeShouldApplyMask(id self, SEL _cmd) {
+// LMThemeIconRecipe: app icon recipe without the mask
+static BOOL LMRecipeShouldApplyMask(id self, SEL _cmd) {
   return NO;
 }
 
 // and without the white/black plate behind the icon
-static id AVRecipePrimaryEffect(id self, SEL _cmd, id __autoreleasing *backgroundContent) {
-  struct objc_super superclass = { self, class_getSuperclass(AVRecipeClass) };
+static id LMRecipePrimaryEffect(id self, SEL _cmd, id __autoreleasing *backgroundContent) {
+  struct objc_super superclass = { self, class_getSuperclass(LMRecipeClass) };
   id effect = ((id (*)(struct objc_super *, SEL, id __autoreleasing *))objc_msgSendSuper)(&superclass, _cmd, backgroundContent);
   if (backgroundContent) *backgroundContent = nil;
   return effect;
 }
 
-static ISResourceProvider *AVMakeProvider(NSDictionary *entry) {
-  id bag = AVImageBag(entry[AVIconLight]);
-  if (!bag || !AVProviderClass) return nil;
-  ISResourceProvider *provider = [[AVProviderClass alloc] initWithResource:bag templateResource:nil];
+static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
+  id bag = LMImageBag(entry[LMIconLight]);
+  if (!bag || !LMProviderClass) return nil;
+  ISResourceProvider *provider = [[LMProviderClass alloc] initWithResource:bag templateResource:nil];
   if (!provider) return nil;
-  objc_setAssociatedObject(provider, &AVIconEntryKey, entry, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  objc_setAssociatedObject(provider, &LMIconEntryKey, entry, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-  AVIconStore *store = [AVIconStore sharedStore];
+  LMIconStore *store = [LMIconStore sharedStore];
   // 1 = app icon
   if ([provider respondsToSelector:@selector(setResourceType:)]) [provider setResourceType:1];
   if ([provider respondsToSelector:@selector(setAllowNonDefaultAppearances:)]) [provider setAllowNonDefaultAppearances:!store.keepsIconsInDarkAndTinted];
   if ([provider respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [provider setAllowAlterationsToResourceArt:YES];
   // only used if the descriptor doesn't ask for a shape itself
-  if (!store.usesSystemIconShape && AVRecipeClass && [provider respondsToSelector:@selector(setSuggestedRecipe:)]) [provider setSuggestedRecipe:[AVRecipeClass new]];
+  if (!store.usesSystemIconShape && LMRecipeClass && [provider respondsToSelector:@selector(setSuggestedRecipe:)]) [provider setSuggestedRecipe:[LMRecipeClass new]];
   return provider;
 }
 
 // only for requests with the themed digest, a process without the tweak wants the stock icon
-static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSString *bundleIdentifier, ISConcreteIcon *(^themedTwin)(void)) {
+static ISResourceProvider *LMProviderForRequest(ISConcreteIcon *request, NSString *bundleIdentifier, ISConcreteIcon *(^themedTwin)(void)) {
   if (!bundleIdentifier) return nil;
   // the requesting process may already use a newer map
-  [[AVIconStore sharedStore] reloadIfMapChanged];
-  NSDictionary *entry = [[AVIconStore sharedStore] iconForBundleIdentifier:bundleIdentifier];
+  [[LMIconStore sharedStore] reloadIfMapChanged];
+  NSDictionary *entry = [[LMIconStore sharedStore] iconForBundleIdentifier:bundleIdentifier];
   if (!entry) return nil;
   NSUUID *expected = [themedTwin() digest];
   if (!expected || ![expected isEqual:[request digest]]) return nil;
-  return AVMakeProvider(entry);
+  return LMMakeProvider(entry);
 }
 
 #pragma mark - Hooks
@@ -196,7 +196,7 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
 
 - (instancetype)initWithBundleIdentifier:(NSString *)bundleIdentifier {
   self = %orig;
-  AVMarkThemed(self, bundleIdentifier);
+  LMMarkThemed(self, bundleIdentifier);
   return self;
 }
 
@@ -204,7 +204,7 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
 - (id)_makeResourceProviderAllowIconResourceFallback:(BOOL)allowFallback {
   if (allowFallback) {
     NSString *bundleIdentifier = [self bundleIdentifier];
-    ISResourceProvider *provider = AVProviderForRequest(self, bundleIdentifier, ^ISConcreteIcon *{
+    ISResourceProvider *provider = LMProviderForRequest(self, bundleIdentifier, ^ISConcreteIcon *{
       return [[%c(ISBundleIdentifierIcon) alloc] initWithBundleIdentifier:bundleIdentifier];
     });
     if (provider) return provider;
@@ -219,13 +219,13 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
 - (instancetype)initWithBundleURL:(NSURL *)url type:(NSString *)type tag:(NSString *)tag tagClass:(NSString *)tagClass {
   self = %orig;
   // no type/tag = the app icon of the bundle
-  if (!type && !(tag && tagClass)) AVMarkThemed(self, AVBundleIdentifierForAppURL(url));
+  if (!type && !(tag && tagClass)) LMMarkThemed(self, LMBundleIdentifierForAppURL(url));
   return self;
 }
 
 - (id)_makeAppResourceProvider {
   NSURL *url = [self url];
-  ISResourceProvider *provider = AVProviderForRequest(self, AVBundleIdentifierForAppURL(url), ^ISConcreteIcon *{
+  ISResourceProvider *provider = LMProviderForRequest(self, LMBundleIdentifierForAppURL(url), ^ISConcreteIcon *{
     return [[%c(ISBundleIcon) alloc] initWithBundleURL:url type:nil tag:nil tagClass:nil];
   });
   return provider ? : %orig;
@@ -237,7 +237,7 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
 
 - (instancetype)initWithApplicationIdentity:(id)identity {
   self = %orig;
-  AVMarkThemed(self, AVBundleIdentifierForIdentity(identity));
+  LMMarkThemed(self, LMBundleIdentifierForIdentity(identity));
   return self;
 }
 
@@ -246,7 +246,7 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
   NSString *identityString = [self identityString];
   if (allowFallback && identityString && [identityClass instancesRespondToSelector:@selector(initWithIdentityString:)]) {
     id identity = [[identityClass alloc] initWithIdentityString:identityString];
-    ISResourceProvider *provider = AVProviderForRequest(self, AVBundleIdentifierForIdentity(identity), ^ISConcreteIcon *{
+    ISResourceProvider *provider = LMProviderForRequest(self, LMBundleIdentifierForIdentity(identity), ^ISConcreteIcon *{
       return [[%c(ISApplicationIdentityIcon) alloc] initWithApplicationIdentity:identity];
     });
     if (provider) return provider;
@@ -260,59 +260,59 @@ static ISResourceProvider *AVProviderForRequest(ISConcreteIcon *request, NSStrin
 
 #pragma mark - Setup
 
-static Class AVSubclass(Class base, const char *name) {
+static Class LMSubclass(Class base, const char *name) {
   Class existing = objc_getClass(name);
   if (existing) return existing;
   Class subclass = base ? objc_allocateClassPair(base, name, 0) : Nil;
   return subclass;
 }
 
-static void AVInstallIconHooks(void) {
-  if (AVHooksInstalled) return;
+static void LMInstallIconHooks(void) {
+  if (LMHooksInstalled) return;
   Class concreteIcon = objc_getClass("ISConcreteIcon");
   Class providerBase = objc_getClass("ISResourceProvider");
   if (!concreteIcon || !providerBase || !objc_getClass("ISBundleIdentifierIcon") || !objc_getClass("IFImage") || !objc_getClass("IFImageBag")) return;
   // no _digest, no way to keep themed and stock icons apart
   Ivar digest = class_getInstanceVariable(concreteIcon, "_digest");
   if (!digest || ![providerBase instancesRespondToSelector:@selector(initWithResource:templateResource:)]) return;
-  AVHooksInstalled = YES;
-  AVDigestIvar = digest;
-  AVImageBags = [NSCache new];
-  AVImageBags.countLimit = 300;
-  AVAppURLIdentifiers = [NSCache new];
+  LMHooksInstalled = YES;
+  LMDigestIvar = digest;
+  LMImageBags = [NSCache new];
+  LMImageBags.countLimit = 300;
+  LMAppURLIdentifiers = [NSCache new];
 
-  Class provider = AVSubclass(providerBase, "AVThemeIconProvider");
-  if (provider && !objc_getClass("AVThemeIconProvider")) {
-    class_addMethod(provider, @selector(configureProviderFromDescriptor:), (IMP)AVProviderConfigure, "v@:@");
+  Class provider = LMSubclass(providerBase, "LMThemeIconProvider");
+  if (provider && !objc_getClass("LMThemeIconProvider")) {
+    class_addMethod(provider, @selector(configureProviderFromDescriptor:), (IMP)LMProviderConfigure, "v@:@");
     objc_registerClassPair(provider);
   }
-  AVProviderClass = provider;
+  LMProviderClass = provider;
 
   Class appRecipe = objc_getClass("ISiOSAppRecipe");
-  Class recipe = AVSubclass(appRecipe, "AVThemeIconRecipe");
-  if (recipe && !objc_getClass("AVThemeIconRecipe")) {
-    class_addMethod(recipe, @selector(shouldApplyMask), (IMP)AVRecipeShouldApplyMask, "B@:");
+  Class recipe = LMSubclass(appRecipe, "LMThemeIconRecipe");
+  if (recipe && !objc_getClass("LMThemeIconRecipe")) {
+    class_addMethod(recipe, @selector(shouldApplyMask), (IMP)LMRecipeShouldApplyMask, "B@:");
     SEL primaryEffect = @selector(primaryResourceEffectReturningBackgroundContentOverride:);
-    if (class_getInstanceMethod(appRecipe, primaryEffect)) class_addMethod(recipe, primaryEffect, (IMP)AVRecipePrimaryEffect, "@@:^@");
+    if (class_getInstanceMethod(appRecipe, primaryEffect)) class_addMethod(recipe, primaryEffect, (IMP)LMRecipePrimaryEffect, "@@:^@");
     objc_registerClassPair(recipe);
   }
-  AVRecipeClass = recipe;
+  LMRecipeClass = recipe;
 
   %init(Icons);
 }
 
-static void AVImageAdded(const struct mach_header *header, intptr_t slide) {
-  if (AVHooksInstalled) return;
+static void LMImageAdded(const struct mach_header *header, intptr_t slide) {
+  if (LMHooksInstalled) return;
   Dl_info info;
   if (!dladdr(header, &info) || !info.dli_fname || !strstr(info.dli_fname, "/IconServices.framework/")) return;
   // IconServices got loaded after us
-  dispatch_async(dispatch_get_main_queue(), ^{ AVInstallIconHooks(); });
+  dispatch_async(dispatch_get_main_queue(), ^{ LMInstallIconHooks(); });
 }
 
 %ctor {
   @autoreleasepool {
     if (![[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){17, 0, 0}]) return;
-    AVInstallIconHooks();
-    if (!AVHooksInstalled) _dyld_register_func_for_add_image(AVImageAdded);
+    LMInstallIconHooks();
+    if (!LMHooksInstalled) _dyld_register_func_for_add_image(LMImageAdded);
   }
 }

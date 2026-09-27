@@ -1,15 +1,15 @@
-#import "AVSettingsViewController.h"
-#import "AVApplyViewController.h"
-#import "AVConfigStore.h"
+#import "LMSettingsViewController.h"
+#import "LMApplyViewController.h"
+#import "LMConfigStore.h"
 
-typedef NS_ENUM(NSInteger, AVSettingsSection) {
-  AVSettingsSectionIconStyle,
-  AVSettingsSectionIconCache,
-  AVSettingsSectionAbout,
-  AVSettingsSectionCount,
+typedef NS_ENUM(NSInteger, LMSettingsSection) {
+  LMSettingsSectionIconStyle,
+  LMSettingsSectionIconCache,
+  LMSettingsSectionAbout,
+  LMSettingsSectionCount,
 };
 
-@implementation AVSettingsViewController
+@implementation LMSettingsViewController
 
 - (instancetype)init {
   return [super initWithStyle:UITableViewStyleInsetGrouped];
@@ -17,7 +17,7 @@ typedef NS_ENUM(NSInteger, AVSettingsSection) {
 
 - (void)viewDidLoad {
   [super viewDidLoad];
-  self.title = AVLocalized(@"Settings");
+  self.title = LMLocalized(@"Settings");
   self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
 }
 
@@ -35,28 +35,28 @@ typedef NS_ENUM(NSInteger, AVSettingsSection) {
 
 - (void)save {
   NSError *error;
-  if ([[AVConfigStore sharedStore] save:&error]) return;
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:AVLocalized(@"Couldn't save") message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:AVLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
+  if ([[LMConfigStore sharedStore] save:&error]) return;
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
   [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)systemShapeChanged:(UISwitch *)toggle {
-  [AVConfigStore sharedStore].useSystemIconShape = toggle.on;
+  [LMConfigStore sharedStore].useSystemIconShape = toggle.on;
   [self save];
 }
 
 - (void)keepAppearanceChanged:(UISwitch *)toggle {
-  [AVConfigStore sharedStore].keepIconsInDarkAndTinted = toggle.on;
+  [LMConfigStore sharedStore].keepIconsInDarkAndTinted = toggle.on;
   [self save];
 }
 
 - (void)confirmClearIconCache {
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:AVLocalized(@"Clear icon cache?") message:AVLocalized(@"All app icons are rendered again, then SpringBoard restarts. This can take a minute.") preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:AVLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
-  [alert addAction:[UIAlertAction actionWithTitle:AVLocalized(@"Clear & Respring") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Clear icon cache?") message:LMLocalized(@"All app icons are rendered again, then SpringBoard restarts. This can take a minute.") preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
+  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Clear & Respring") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
     [self save];
-    [self presentViewController:[[AVApplyViewController alloc] initWithClearingIconCache:YES] animated:YES completion:nil];
+    [self presentViewController:[[LMApplyViewController alloc] initWithClearingIconCache:YES] animated:YES completion:nil];
   }]];
   [self presentViewController:alert animated:YES completion:nil];
 }
@@ -64,31 +64,31 @@ typedef NS_ENUM(NSInteger, AVSettingsSection) {
 #pragma mark - Table view
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-  return AVSettingsSectionCount;
+  return LMSettingsSectionCount;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
   switch (section) {
-    case AVSettingsSectionIconStyle: return 2;
-    case AVSettingsSectionIconCache: return 1;
-    case AVSettingsSectionAbout: return 2;
+    case LMSettingsSectionIconStyle: return 2;
+    case LMSettingsSectionIconCache: return 1;
+    case LMSettingsSectionAbout: return 2;
   }
   return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
   switch (section) {
-    case AVSettingsSectionIconStyle: return AVLocalized(@"Theme icons");
-    case AVSettingsSectionIconCache: return AVLocalized(@"Icon cache");
-    case AVSettingsSectionAbout: return AVLocalized(@"About");
+    case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons");
+    case LMSettingsSectionIconCache: return LMLocalized(@"Icon cache");
+    case LMSettingsSectionAbout: return LMLocalized(@"About");
   }
   return nil;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   switch (section) {
-    case AVSettingsSectionIconStyle: return AVLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Tap Apply afterwards.");
-    case AVSettingsSectionIconCache: return AVLocalized(@"Renders every app icon again. Use it if icons still look wrong after installing or updating themes.");
+    case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Tap Apply afterwards.");
+    case LMSettingsSectionIconCache: return LMLocalized(@"Renders every app icon again. Use it if icons still look wrong after installing or updating themes.");
   }
   return nil;
 }
@@ -96,30 +96,30 @@ typedef NS_ENUM(NSInteger, AVSettingsSection) {
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
   UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
   UIListContentConfiguration *content = [UIListContentConfiguration cellConfiguration];
-  AVConfigStore *config = [AVConfigStore sharedStore];
+  LMConfigStore *config = [LMConfigStore sharedStore];
   cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-  if (indexPath.section == AVSettingsSectionIconStyle && indexPath.row == 0) {
-    content.text = AVLocalized(@"iOS icon shape");
+  if (indexPath.section == LMSettingsSectionIconStyle && indexPath.row == 0) {
+    content.text = LMLocalized(@"iOS icon shape");
     content.image = [UIImage systemImageNamed:@"app"];
     cell.accessoryView = [self switchWithValue:config.useSystemIconShape action:@selector(systemShapeChanged:)];
-  } else if (indexPath.section == AVSettingsSectionIconStyle) {
-    content.text = AVLocalized(@"Keep in dark & tinted mode");
+  } else if (indexPath.section == LMSettingsSectionIconStyle) {
+    content.text = LMLocalized(@"Keep in dark & tinted mode");
     content.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
     cell.accessoryView = [self switchWithValue:config.keepIconsInDarkAndTinted action:@selector(keepAppearanceChanged:)];
-  } else if (indexPath.section == AVSettingsSectionIconCache) {
-    content.text = AVLocalized(@"Clear icon cache & respring");
+  } else if (indexPath.section == LMSettingsSectionIconCache) {
+    content.text = LMLocalized(@"Clear icon cache & respring");
     content.textProperties.color = self.view.tintColor;
     content.image = [UIImage systemImageNamed:@"arrow.clockwise"];
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
   } else if (indexPath.row == 0) {
     content = [UIListContentConfiguration valueCellConfiguration];
-    content.text = AVLocalized(@"Version");
+    content.text = LMLocalized(@"Version");
     content.secondaryText = [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"];
   } else {
     content = [UIListContentConfiguration subtitleCellConfiguration];
-    content.text = AVLocalized(@"Themes folder");
-    content.secondaryText = AVThemesDirectoryDisplayName;
+    content.text = LMLocalized(@"Themes folder");
+    content.secondaryText = LMThemesDirectoryDisplayName;
     content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
   }
   cell.contentConfiguration = content;
@@ -128,7 +128,7 @@ typedef NS_ENUM(NSInteger, AVSettingsSection) {
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
-  if (indexPath.section == AVSettingsSectionIconCache) [self confirmClearIconCache];
+  if (indexPath.section == LMSettingsSectionIconCache) [self confirmClearIconCache];
 }
 
 @end

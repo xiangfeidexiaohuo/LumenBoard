@@ -1,6 +1,6 @@
-#import "AVAppDelegate.h"
+#import "LMAppDelegate.h"
 
 // Sheet shown while SpringBoard pre-renders the theme icons and resprings.
-@interface AVApplyViewController : UIViewController
+@interface LMApplyViewController : UIViewController
 - (instancetype)initWithClearingIconCache:(BOOL)clearIconCache;
 @end

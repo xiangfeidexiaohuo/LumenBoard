@@ -1,4 +1,4 @@
-#import "AVThemeLibrary.h"
+#import "LMThemeLibrary.h"
 #include <os/lock.h>
 #include <sys/utsname.h>
 
@@ -6,9 +6,9 @@
 typedef struct {
   NSInteger appearance; // 0 light, 1 dark, 2 tinted
   NSInteger rank;       // higher wins: matching device, then "-large", then scale
-} AVIconFileTraits;
+} LMIconFileTraits;
 
-static BOOL AVDeviceIsPad(void) {
+static BOOL LMDeviceIsPad(void) {
   static BOOL pad;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
@@ -19,7 +19,7 @@ static BOOL AVDeviceIsPad(void) {
   return pad;
 }
 
-static NSRegularExpression *AVTrailingSuffix(void) {
+static NSRegularExpression *LMTrailingSuffix(void) {
   static NSRegularExpression *expression;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
@@ -29,13 +29,13 @@ static NSRegularExpression *AVTrailingSuffix(void) {
 }
 
 // Returns the lowercased icon name (bundle identifier or app name), or nil if the file isn't an icon.
-static NSString *AVIconNameForFile(NSString *file, AVIconFileTraits *traits) {
+static NSString *LMIconNameForFile(NSString *file, LMIconFileTraits *traits) {
   if ([file.pathExtension caseInsensitiveCompare:@"png"] != NSOrderedSame) return nil;
   NSString *name = file.stringByDeletingPathExtension;
   NSInteger scale = 1, device = 1, large = 0, appearance = 0;
-  BOOL pad = AVDeviceIsPad();
+  BOOL pad = LMDeviceIsPad();
   for (;;) {
-    NSTextCheckingResult *match = [AVTrailingSuffix() firstMatchInString:name options:0 range:NSMakeRange(0, name.length)];
+    NSTextCheckingResult *match = [LMTrailingSuffix() firstMatchInString:name options:0 range:NSMakeRange(0, name.length)];
     if (!match || match.range.location == 0) break;
     NSString *suffix = [name substringWithRange:match.range].lowercaseString;
     if ([suffix isEqualToString:@"-large"]) large = 1;
@@ -52,17 +52,17 @@ static NSString *AVIconNameForFile(NSString *file, AVIconFileTraits *traits) {
   return name.lowercaseString;
 }
 
-static os_unfair_lock AVLibraryLock = OS_UNFAIR_LOCK_INIT;
-static NSMutableDictionary *AVFolderCache; // "<theme>/<folder>" -> parsed icons
+static os_unfair_lock LMLibraryLock = OS_UNFAIR_LOCK_INIT;
+static NSMutableDictionary *LMFolderCache; // "<theme>/<folder>" -> parsed icons
 
-@implementation AVThemeLibrary
+@implementation LMThemeLibrary
 
 + (NSArray<NSString *> *)installedThemes {
   NSMutableArray *themes = [NSMutableArray new];
-  for (NSString *folder in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:AVThemesDirectory error:nil]) {
+  for (NSString *folder in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:LMThemesDirectory error:nil]) {
     if ([folder hasPrefix:@"."]) continue;
     BOOL isDirectory = NO;
-    NSString *path = [AVThemesDirectory stringByAppendingPathComponent:folder];
+    NSString *path = [LMThemesDirectory stringByAppendingPathComponent:folder];
     if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && isDirectory) [themes addObject:folder];
   }
   [themes sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
@@ -78,19 +78,19 @@ static NSMutableDictionary *AVFolderCache; // "<theme>/<folder>" -> parsed icons
 + (NSDictionary<NSString *, NSDictionary *> *)iconsInFolder:(NSString *)folder ofTheme:(NSString *)theme {
   if (!theme.length) return @{};
   NSString *cacheKey = [theme stringByAppendingPathComponent:folder];
-  os_unfair_lock_lock(&AVLibraryLock);
-  NSDictionary *cached = AVFolderCache[cacheKey];
-  os_unfair_lock_unlock(&AVLibraryLock);
+  os_unfair_lock_lock(&LMLibraryLock);
+  NSDictionary *cached = LMFolderCache[cacheKey];
+  os_unfair_lock_unlock(&LMLibraryLock);
   if (cached) return cached;
 
-  NSString *directory = [[AVThemesDirectory stringByAppendingPathComponent:theme] stringByAppendingPathComponent:folder];
+  NSString *directory = [[LMThemesDirectory stringByAppendingPathComponent:theme] stringByAppendingPathComponent:folder];
   NSMutableDictionary *icons = [NSMutableDictionary new];
   NSMutableDictionary *ranks = [NSMutableDictionary new];
   for (NSString *file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:directory error:nil]) {
-    AVIconFileTraits traits;
-    NSString *name = AVIconNameForFile(file, &traits);
+    LMIconFileTraits traits;
+    NSString *name = LMIconNameForFile(file, &traits);
     if (!name) continue;
-    NSString *slot = @[AVIconLight, AVIconDark, AVIconTinted][traits.appearance];
+    NSString *slot = @[LMIconLight, LMIconDark, LMIconTinted][traits.appearance];
     NSString *rankKey = [NSString stringWithFormat:@"%@\n%@", name, slot];
     NSNumber *best = ranks[rankKey];
     if (best && best.integerValue >= traits.rank) continue;
@@ -99,13 +99,13 @@ static NSMutableDictionary *AVFolderCache; // "<theme>/<folder>" -> parsed icons
     icon[slot] = [directory stringByAppendingPathComponent:file];
   }
   // dark/tinted artwork without a normal icon isn't usable on its own
-  for (NSString *name in icons.allKeys) if (!icons[name][AVIconLight]) [icons removeObjectForKey:name];
+  for (NSString *name in icons.allKeys) if (!icons[name][LMIconLight]) [icons removeObjectForKey:name];
 
   NSDictionary *result = [icons copy];
-  os_unfair_lock_lock(&AVLibraryLock);
-  if (!AVFolderCache) AVFolderCache = [NSMutableDictionary new];
-  AVFolderCache[cacheKey] = result;
-  os_unfair_lock_unlock(&AVLibraryLock);
+  os_unfair_lock_lock(&LMLibraryLock);
+  if (!LMFolderCache) LMFolderCache = [NSMutableDictionary new];
+  LMFolderCache[cacheKey] = result;
+  os_unfair_lock_unlock(&LMLibraryLock);
   return result;
 }
 
@@ -133,9 +133,9 @@ static NSMutableDictionary *AVFolderCache; // "<theme>/<folder>" -> parsed icons
 }
 
 + (void)invalidate {
-  os_unfair_lock_lock(&AVLibraryLock);
-  [AVFolderCache removeAllObjects];
-  os_unfair_lock_unlock(&AVLibraryLock);
+  os_unfair_lock_lock(&LMLibraryLock);
+  [LMFolderCache removeAllObjects];
+  os_unfair_lock_unlock(&LMLibraryLock);
 }
 
 @end

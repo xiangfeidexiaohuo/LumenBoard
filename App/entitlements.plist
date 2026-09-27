@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>application-identifier</key>
-	<string>com.xsxs18.Avalanche</string>
+	<string>com.xsxs18.Lumen</string>
 	<key>platform-application</key>
 	<true/>
 	<key>com.apple.private.security.no-container</key>

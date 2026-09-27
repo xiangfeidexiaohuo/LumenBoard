@@ -1,12 +1,12 @@
-#import "AVConfigStore.h"
+#import "LMConfigStore.h"
 #include <sys/stat.h>
 
-@implementation AVConfigStore {
+@implementation LMConfigStore {
   NSDictionary *_appliedConfig;
 }
 
 + (instancetype)sharedStore {
-  static AVConfigStore *store;
+  static LMConfigStore *store;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
     store = [self new];
@@ -16,13 +16,13 @@
 
 - (instancetype)init {
   if ((self = [super init])) {
-    NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:AVConfigPath] ? : @{};
-    NSArray *themes = config[AVConfigEnabledThemes];
+    NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:LMConfigPath] ? : @{};
+    NSArray *themes = config[LMConfigEnabledThemes];
     _enabledThemes = [themes isKindOfClass:[NSArray class]] ? [themes copy] : @[];
-    _useSystemIconShape = [config[AVConfigUseSystemIconShape] boolValue];
-    _keepIconsInDarkAndTinted = [config[AVConfigKeepIconsInDarkAndTinted] boolValue];
+    _useSystemIconShape = [config[LMConfigUseSystemIconShape] boolValue];
+    _keepIconsInDarkAndTinted = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
     // what SpringBoard last applied, so the app knows about pending changes even after a restart
-    NSDictionary *applied = [NSDictionary dictionaryWithContentsOfFile:AVIconMapPath][AVMapAppliedConfig];
+    NSDictionary *applied = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath][LMMapAppliedConfig];
     _appliedConfig = [applied isKindOfClass:[NSDictionary class]] ? applied : [self dictionaryRepresentation];
   }
   return self;
@@ -30,9 +30,9 @@
 
 - (NSDictionary *)dictionaryRepresentation {
   return @{
-    AVConfigEnabledThemes : _enabledThemes ? : @[],
-    AVConfigUseSystemIconShape : @(_useSystemIconShape),
-    AVConfigKeepIconsInDarkAndTinted : @(_keepIconsInDarkAndTinted)
+    LMConfigEnabledThemes : _enabledThemes ? : @[],
+    LMConfigUseSystemIconShape : @(_useSystemIconShape),
+    LMConfigKeepIconsInDarkAndTinted : @(_keepIconsInDarkAndTinted)
   };
 }
 
@@ -41,10 +41,10 @@
 }
 
 - (BOOL)save:(NSError **)error {
-  if (![[NSFileManager defaultManager] createDirectoryAtPath:AVDataDirectory withIntermediateDirectories:YES attributes:nil error:error]) return NO;
+  if (![[NSFileManager defaultManager] createDirectoryAtPath:LMDataDirectory withIntermediateDirectories:YES attributes:nil error:error]) return NO;
   NSData *data = [NSPropertyListSerialization dataWithPropertyList:[self dictionaryRepresentation] format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
-  if (!data || ![data writeToFile:AVConfigPath options:NSDataWritingAtomic error:error]) return NO;
-  chmod(AVConfigPath.fileSystemRepresentation, 0644);
+  if (!data || ![data writeToFile:LMConfigPath options:NSDataWritingAtomic error:error]) return NO;
+  chmod(LMConfigPath.fileSystemRepresentation, 0644);
   return YES;
 }
 

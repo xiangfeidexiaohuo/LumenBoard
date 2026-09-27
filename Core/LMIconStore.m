@@ -1,7 +1,7 @@
-#import "AVIconStore.h"
+#import "LMIconStore.h"
 #include <sys/stat.h>
 
-@implementation AVIconStore {
+@implementation LMIconStore {
   NSLock *_lock;
   BOOL _loaded;
   NSDictionary *_icons;
@@ -13,20 +13,20 @@
   CFAbsoluteTime _lastCheck;
 }
 
-static BOOL AVStatMap(struct stat *info) {
-  return stat(AVIconMapPath.fileSystemRepresentation, info) == 0;
+static BOOL LMStatMap(struct stat *info) {
+  return stat(LMIconMapPath.fileSystemRepresentation, info) == 0;
 }
 
-static void AVMapChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
-  [[AVIconStore sharedStore] reload];
+static void LMMapChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
+  [[LMIconStore sharedStore] reload];
 }
 
 + (instancetype)sharedStore {
-  static AVIconStore *store;
+  static LMIconStore *store;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
     store = [self new];
-    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, AVMapChanged, CFSTR(AVNotifyMapChanged), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, LMMapChanged, CFSTR(LMNotifyMapChanged), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
   });
   return store;
 }
@@ -40,24 +40,24 @@ static void AVMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
 - (void)loadIfNeeded {
   if (_loaded) return;
   struct stat info;
-  BOOL exists = AVStatMap(&info);
+  BOOL exists = LMStatMap(&info);
   _mapModified = exists ? info.st_mtimespec : (struct timespec){ 0, 0 };
   _mapInode = exists ? info.st_ino : 0;
   _lastCheck = CFAbsoluteTimeGetCurrent();
-  NSDictionary *map = exists ? [NSDictionary dictionaryWithContentsOfFile:AVIconMapPath] : nil;
-  BOOL valid = [map[@"Version"] integerValue] == AVMapVersion && [map[AVMapIcons] isKindOfClass:[NSDictionary class]];
+  NSDictionary *map = exists ? [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath] : nil;
+  BOOL valid = [map[@"Version"] integerValue] == LMMapVersion && [map[LMMapIcons] isKindOfClass:[NSDictionary class]];
   // the map has jailbreak paths, turn them into real ones
   NSMutableDictionary *icons = [NSMutableDictionary new];
-  if (valid) [map[AVMapIcons] enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *entry, BOOL *stop) {
+  if (valid) [map[LMMapIcons] enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *entry, BOOL *stop) {
     if (![entry isKindOfClass:[NSDictionary class]]) return;
     NSMutableDictionary *icon = [entry mutableCopy];
-    for (NSString *slot in @[AVIconLight, AVIconDark, AVIconTinted])
-      if ([entry[slot] isKindOfClass:[NSString class]]) icon[slot] = AVRootPath(entry[slot]);
+    for (NSString *slot in @[LMIconLight, LMIconDark, LMIconTinted])
+      if ([entry[slot] isKindOfClass:[NSString class]]) icon[slot] = LMRootPath(entry[slot]);
     icons[bundleID] = icon;
   }];
   _icons = icons;
-  _usesSystemIconShape = valid && [map[AVConfigUseSystemIconShape] boolValue];
-  _keepsIconsInDarkAndTinted = valid && [map[AVConfigKeepIconsInDarkAndTinted] boolValue];
+  _usesSystemIconShape = valid && [map[LMConfigUseSystemIconShape] boolValue];
+  _keepsIconsInDarkAndTinted = valid && [map[LMConfigKeepIconsInDarkAndTinted] boolValue];
   _loaded = YES;
 }
 
@@ -68,7 +68,7 @@ static void AVMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
   if (now - _lastCheck < interval) return;
   _lastCheck = now;
   struct stat info;
-  BOOL exists = AVStatMap(&info);
+  BOOL exists = LMStatMap(&info);
   struct timespec modified = exists ? info.st_mtimespec : (struct timespec){ 0, 0 };
   if (modified.tv_sec != _mapModified.tv_sec || modified.tv_nsec != _mapModified.tv_nsec || (exists ? info.st_ino : 0) != _mapInode) _loaded = NO;
 }
@@ -87,7 +87,7 @@ static void AVMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
   [self loadIfNeeded];
   NSDictionary *icon = _icons[key];
   [_lock unlock];
-  return ([icon isKindOfClass:[NSDictionary class]] && icon[AVIconLight] && icon[AVIconToken]) ? icon : nil;
+  return ([icon isKindOfClass:[NSDictionary class]] && icon[LMIconLight] && icon[LMIconToken]) ? icon : nil;
 }
 
 - (NSUInteger)themedIconCount {

@@ -1,8 +1,8 @@
-#import "AVApplyViewController.h"
-#import "AVConfigStore.h"
+#import "LMApplyViewController.h"
+#import "LMConfigStore.h"
 #import <notify.h>
 
-@implementation AVApplyViewController {
+@implementation LMApplyViewController {
   BOOL _clearIconCache;
   BOOL _springBoardAnswered;
   int _progressToken;
@@ -39,7 +39,7 @@
 
   _titleLabel = [UILabel new];
   _titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
-  _titleLabel.text = _clearIconCache ? AVLocalized(@"Rebuilding icons") : AVLocalized(@"Applying theme");
+  _titleLabel.text = _clearIconCache ? LMLocalized(@"Rebuilding icons") : LMLocalized(@"Applying theme");
 
   _progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
   _progressView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -49,10 +49,10 @@
   _statusLabel.textColor = [UIColor secondaryLabelColor];
   _statusLabel.textAlignment = NSTextAlignmentCenter;
   _statusLabel.numberOfLines = 0;
-  _statusLabel.text = AVLocalized(@"Preparing…");
+  _statusLabel.text = LMLocalized(@"Preparing…");
 
   UIButtonConfiguration *configuration = [UIButtonConfiguration grayButtonConfiguration];
-  configuration.title = AVLocalized(@"Close");
+  configuration.title = LMLocalized(@"Close");
   configuration.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
   __weak typeof(self) weakSelf = self;
   _closeButton = [UIButton buttonWithConfiguration:configuration primaryAction:[UIAction actionWithHandler:^(UIAction *action) {
@@ -88,13 +88,13 @@
 
   // SpringBoard reports (done << 32) | total while it renders the theme icons, done == UINT32_MAX before respringing
   __weak typeof(self) weakSelf = self;
-  notify_register_dispatch(AVNotifyProgress, &_progressToken, dispatch_get_main_queue(), ^(int token) {
+  notify_register_dispatch(LMNotifyProgress, &_progressToken, dispatch_get_main_queue(), ^(int token) {
     uint64_t state = 0;
     notify_get_state(token, &state);
     [weakSelf showProgress:(uint32_t)(state >> 32) of:(uint32_t)(state & 0xFFFFFFFF)];
   });
-  notify_post(_clearIconCache ? AVNotifyClearCache : AVNotifyApply);
-  [[AVConfigStore sharedStore] markApplied];
+  notify_post(_clearIconCache ? LMNotifyClearCache : LMNotifyApply);
+  [[LMConfigStore sharedStore] markApplied];
 
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
     [weakSelf showFailureIfSpringBoardIsSilent];
@@ -105,11 +105,11 @@
   _springBoardAnswered = YES;
   if (done == UINT32_MAX || !total) {
     _progressView.progress = 1;
-    _statusLabel.text = AVLocalized(@"Respringing…");
+    _statusLabel.text = LMLocalized(@"Respringing…");
     return;
   }
   [_progressView setProgress:(float)done / total animated:YES];
-  _statusLabel.text = [NSString localizedStringWithFormat:AVLocalized(@"Rendering icons: %u of %u"), done, total];
+  _statusLabel.text = [NSString localizedStringWithFormat:LMLocalized(@"Rendering icons: %u of %u"), done, total];
 }
 
 - (void)showFailureIfSpringBoardIsSilent {
@@ -118,7 +118,7 @@
   _symbol.image = [UIImage systemImageNamed:@"exclamationmark.triangle.fill" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:52 weight:UIImageSymbolWeightMedium]];
   _symbol.tintColor = [UIColor systemOrangeColor];
   _progressView.hidden = YES;
-  _statusLabel.text = AVLocalized(@"SpringBoard didn't answer. Make sure Avalanche is enabled in your tweak injector, respring once and try again.");
+  _statusLabel.text = LMLocalized(@"SpringBoard didn't answer. Make sure Lumen is enabled in your tweak injector, respring once and try again.");
   _closeButton.hidden = NO;
   self.modalInPresentation = NO;
 }

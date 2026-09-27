@@ -9,7 +9,7 @@
 "No themes installed" = "Keine Themes installiert";
 "Install themes from your package manager. They are stored in %@." = "Installiere Themes über deinen Paketmanager (Sileo, Zebra). Sie liegen in %@.";
 "Couldn't save" = "Speichern fehlgeschlagen";
-"%@\n\nAvalanche has to be installed as a package (not as an IPA) so it can write its settings." = "%@\n\nAvalanche muss als Paket (nicht als IPA) installiert sein, damit es seine Einstellungen speichern kann.";
+"%@\n\nLumen has to be installed as a package (not as an IPA) so it can write its settings." = "%@\n\nLumen muss als Paket (nicht als IPA) installiert sein, damit es seine Einstellungen speichern kann.";
 "OK" = "OK";
 "Settings" = "Einstellungen";
 "Theme icons" = "Theme-Icons";
@@ -32,4 +32,4 @@
 "Close" = "Schließen";
 "Respringing…" = "Respring …";
 "Rendering icons: %u of %u" = "Icons werden gerendert: %u von %u";
-"SpringBoard didn't answer. Make sure Avalanche is enabled in your tweak injector, respring once and try again." = "SpringBoard hat nicht geantwortet. Prüfe, ob Avalanche in deinem Tweak-Injector aktiviert ist, mach einen Respring und versuche es erneut.";
+"SpringBoard didn't answer. Make sure Lumen is enabled in your tweak injector, respring once and try again." = "SpringBoard hat nicht geantwortet. Prüfe, ob Lumen in deinem Tweak-Injector aktiviert ist, mach einen Respring und versuche es erneut.";

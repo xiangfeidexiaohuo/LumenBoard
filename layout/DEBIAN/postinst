@@ -7,10 +7,10 @@ else
   [ -d "$JB" ] || JB=""
 fi
 
-mkdir -p "$JB/var/mobile/Library/Avalanche" "$JB/Library/Themes"
-chown -R mobile:mobile "$JB/var/mobile/Library/Avalanche" 2>/dev/null
-chmod 0755 "$JB/var/mobile/Library/Avalanche"
+mkdir -p "$JB/var/mobile/Library/Lumen" "$JB/Library/Themes"
+chown -R mobile:mobile "$JB/var/mobile/Library/Lumen" 2>/dev/null
+chmod 0755 "$JB/var/mobile/Library/Lumen"
 
 killall -9 iconservicesagent 2>/dev/null
-uicache -p "$JB/Applications/Avalanche.app" 2>/dev/null || uicache 2>/dev/null
+uicache -p "$JB/Applications/Lumen.app" 2>/dev/null || uicache 2>/dev/null
 exit 0

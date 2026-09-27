@@ -1,9 +1,9 @@
-#import "../Shared/AVShared.h"
+#import "../Shared/LMShared.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 // Config.plist, the only thing the app writes. SpringBoard turns it into the icon map on "Apply".
-@interface AVConfigStore : NSObject
+@interface LMConfigStore : NSObject
 
 + (instancetype)sharedStore;
 // theme folder names, highest priority first

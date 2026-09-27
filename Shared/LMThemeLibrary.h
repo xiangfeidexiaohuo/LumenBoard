@@ -1,17 +1,17 @@
-#import "AVShared.h"
+#import "LMShared.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 // Reads theme folders in the formats SnowBoard, Anemone and WinterBoard use:
 //   Theme.theme/IconBundles/<bundle id>[-large][-dark|-tinted][@2x|@3x][~iphone|~ipad].png
 //   Theme.theme/Icons/<App Name>.png
-@interface AVThemeLibrary : NSObject
+@interface LMThemeLibrary : NSObject
 
 // folder names in /Library/Themes, sorted by display name
 + (NSArray<NSString *> *)installedThemes;
 // "Viola.theme" -> "Viola"
 + (NSString *)displayNameForTheme:(NSString *)theme;
-// lowercased bundle identifier -> @{ AVIconLight: path, AVIconDark: path, AVIconTinted: path }
+// lowercased bundle identifier -> @{ LMIconLight: path, LMIconDark: path, LMIconTinted: path }
 + (NSDictionary<NSString *, NSDictionary *> *)iconsInTheme:(NSString *)theme;
 // same, keyed by lowercased app name ("Icons" folder)
 + (NSDictionary<NSString *, NSDictionary *> *)iconsByAppNameInTheme:(NSString *)theme;

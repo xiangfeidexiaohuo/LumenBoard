@@ -1,21 +1,21 @@
-#import "AVThemesViewController.h"
-#import "AVSettingsViewController.h"
-#import "AVApplyViewController.h"
-#import "AVConfigStore.h"
-#import "../Shared/AVThemeLibrary.h"
+#import "LMThemesViewController.h"
+#import "LMSettingsViewController.h"
+#import "LMApplyViewController.h"
+#import "LMConfigStore.h"
+#import "../Shared/LMThemeLibrary.h"
 
-typedef NS_ENUM(NSInteger, AVThemeSection) {
-  AVThemeSectionActive,
-  AVThemeSectionInstalled,
+typedef NS_ENUM(NSInteger, LMThemeSection) {
+  LMThemeSectionActive,
+  LMThemeSectionInstalled,
 };
 
 // shown in the theme previews when the theme has them
-static NSArray<NSString *> *AVPreviewApps(void) {
+static NSArray<NSString *> *LMPreviewApps(void) {
   return @[@"com.apple.mobilesafari", @"com.apple.mobilesms", @"com.apple.mobilephone", @"com.apple.camera",
            @"com.apple.mobileslideshow", @"com.apple.preferences", @"com.apple.appstore", @"com.apple.mobilemail"];
 }
 
-static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
+static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   if (!paths.count) return nil;
   const CGFloat side = 44, gap = 3;
   UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side)];
@@ -34,7 +34,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   }];
 }
 
-@implementation AVThemesViewController {
+@implementation LMThemesViewController {
   NSMutableArray<NSString *> *_active;
   NSMutableArray<NSString *> *_installed;
   NSMutableDictionary<NSString *, UIImage *> *_previews;
@@ -49,7 +49,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 
 - (void)viewDidLoad {
   [super viewDidLoad];
-  self.title = @"Avalanche";
+  self.title = @"Lumen";
   _previews = [NSMutableDictionary new];
   _iconCounts = [NSMutableDictionary new];
   _loading = [NSMutableSet new];
@@ -61,7 +61,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 
   __weak typeof(self) weakSelf = self;
   UIButtonConfiguration *configuration = [UIButtonConfiguration filledButtonConfiguration];
-  configuration.title = AVLocalized(@"Apply");
+  configuration.title = LMLocalized(@"Apply");
   configuration.image = [UIImage systemImageNamed:@"square.grid.2x2"];
   configuration.imagePadding = 8;
   configuration.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
@@ -88,10 +88,10 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 #pragma mark - Data
 
 - (void)reloadThemes {
-  [AVThemeLibrary invalidate];
-  NSArray *installed = [AVThemeLibrary installedThemes];
+  [LMThemeLibrary invalidate];
+  NSArray *installed = [LMThemeLibrary installedThemes];
   NSMutableArray *active = [NSMutableArray new];
-  for (NSString *theme in [AVConfigStore sharedStore].enabledThemes)
+  for (NSString *theme in [LMConfigStore sharedStore].enabledThemes)
     if ([theme isKindOfClass:[NSString class]] && [installed containsObject:theme] && ![active containsObject:theme]) [active addObject:theme];
   _active = active;
   _installed = [installed mutableCopy];
@@ -100,7 +100,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   [_iconCounts removeAllObjects];
   [_loading removeAllObjects];
   // themes that were uninstalled drop out of the configuration
-  if (![active isEqualToArray:[AVConfigStore sharedStore].enabledThemes]) [self saveActiveThemes];
+  if (![active isEqualToArray:[LMConfigStore sharedStore].enabledThemes]) [self saveActiveThemes];
 
   [self.refreshControl endRefreshing];
   [self.tableView reloadData];
@@ -109,19 +109,19 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 }
 
 - (NSString *)themeAtIndexPath:(NSIndexPath *)indexPath {
-  NSArray *themes = (indexPath.section == AVThemeSectionActive) ? _active : _installed;
+  NSArray *themes = (indexPath.section == LMThemeSectionActive) ? _active : _installed;
   return (indexPath.row < (NSInteger)themes.count) ? themes[indexPath.row] : nil;
 }
 
 - (BOOL)saveActiveThemes {
-  [AVConfigStore sharedStore].enabledThemes = _active;
+  [LMConfigStore sharedStore].enabledThemes = _active;
   NSError *error;
-  if ([[AVConfigStore sharedStore] save:&error]) {
+  if ([[LMConfigStore sharedStore] save:&error]) {
     [self updateApplyButton];
     return YES;
   }
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:AVLocalized(@"Couldn't save") message:[NSString stringWithFormat:AVLocalized(@"%@\n\nAvalanche has to be installed as a package (not as an IPA) so it can write its settings."), error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:AVLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:[NSString stringWithFormat:LMLocalized(@"%@\n\nLumen has to be installed as a package (not as an IPA) so it can write its settings."), error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
   [self presentViewController:alert animated:YES completion:nil];
   return NO;
 }
@@ -130,19 +130,19 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   if ([_loading containsObject:theme]) return;
   [_loading addObject:theme];
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-    NSDictionary *icons = [AVThemeLibrary iconsInTheme:theme];
+    NSDictionary *icons = [LMThemeLibrary iconsInTheme:theme];
     NSMutableArray *paths = [NSMutableArray new];
-    for (NSString *bundleID in AVPreviewApps()) {
-      NSString *path = icons[bundleID][AVIconLight];
+    for (NSString *bundleID in LMPreviewApps()) {
+      NSString *path = icons[bundleID][LMIconLight];
       if (path && paths.count < 4) [paths addObject:path];
     }
     for (NSString *bundleID in [icons.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
       if (paths.count >= 4) break;
-      NSString *path = icons[bundleID][AVIconLight];
+      NSString *path = icons[bundleID][LMIconLight];
       if (path && ![paths containsObject:path]) [paths addObject:path];
     }
-    UIImage *preview = AVRenderPreview(paths);
-    NSUInteger count = icons.count + [AVThemeLibrary iconsByAppNameInTheme:theme].count;
+    UIImage *preview = LMRenderPreview(paths);
+    NSUInteger count = icons.count + [LMThemeLibrary iconsByAppNameInTheme:theme].count;
     dispatch_async(dispatch_get_main_queue(), ^{
       if (preview) self->_previews[theme] = preview;
       self->_iconCounts[theme] = @(count);
@@ -164,10 +164,10 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   UIImageView *image = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"square.grid.2x2" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:48 weight:UIImageSymbolWeightLight]]];
   image.tintColor = [UIColor tertiaryLabelColor];
   UILabel *title = [UILabel new];
-  title.text = AVLocalized(@"No themes installed");
+  title.text = LMLocalized(@"No themes installed");
   title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleTitle3];
   UILabel *detail = [UILabel new];
-  detail.text = [NSString stringWithFormat:AVLocalized(@"Install themes from your package manager. They are stored in %@."), AVThemesDirectoryDisplayName];
+  detail.text = [NSString stringWithFormat:LMLocalized(@"Install themes from your package manager. They are stored in %@."), LMThemesDirectoryDisplayName];
   detail.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
   detail.textColor = [UIColor secondaryLabelColor];
   detail.numberOfLines = 0;
@@ -189,7 +189,7 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 
 - (void)updateApplyButton {
   UIButtonConfiguration *configuration = _applyButton.configuration;
-  configuration.subtitle = [AVConfigStore sharedStore].hasUnappliedChanges ? AVLocalized(@"Changes not applied yet") : nil;
+  configuration.subtitle = [LMConfigStore sharedStore].hasUnappliedChanges ? LMLocalized(@"Changes not applied yet") : nil;
   _applyButton.configuration = configuration;
   [_applyButton sizeToFit];
 }
@@ -202,12 +202,12 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 #pragma mark - Actions
 
 - (void)showSettings {
-  [self.navigationController pushViewController:[AVSettingsViewController new] animated:YES];
+  [self.navigationController pushViewController:[LMSettingsViewController new] animated:YES];
 }
 
 - (void)apply {
   if (![self saveActiveThemes]) return;
-  [self presentViewController:[[AVApplyViewController alloc] initWithClearingIconCache:NO] animated:YES completion:^{
+  [self presentViewController:[[LMApplyViewController alloc] initWithClearingIconCache:NO] animated:YES completion:^{
     [self updateApplyButton];
   }];
 }
@@ -219,17 +219,17 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-  return (section == AVThemeSectionActive) ? _active.count : _installed.count;
+  return (section == LMThemeSectionActive) ? _active.count : _installed.count;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-  return (section == AVThemeSectionActive) ? AVLocalized(@"Active") : AVLocalized(@"Installed");
+  return (section == LMThemeSectionActive) ? LMLocalized(@"Active") : LMLocalized(@"Installed");
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-  if (section == AVThemeSectionActive)
-    return _active.count ? AVLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order.") : AVLocalized(@"Tap a theme below to activate it.");
-  return _installed.count ? nil : AVLocalized(@"All installed themes are active.");
+  if (section == LMThemeSectionActive)
+    return _active.count ? LMLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order.") : LMLocalized(@"Tap a theme below to activate it.");
+  return _installed.count ? nil : LMLocalized(@"All installed themes are active.");
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -239,16 +239,16 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   if (!count || !_previews[theme]) [self loadDetailsForTheme:theme];
 
   UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
-  content.text = [AVThemeLibrary displayNameForTheme:theme];
+  content.text = [LMThemeLibrary displayNameForTheme:theme];
   content.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
-  content.secondaryText = count ? [NSString localizedStringWithFormat:AVLocalized(@"%lu icons"), (unsigned long)count.unsignedIntegerValue] : @" ";
+  content.secondaryText = count ? [NSString localizedStringWithFormat:LMLocalized(@"%lu icons"), (unsigned long)count.unsignedIntegerValue] : @" ";
   content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
   content.image = _previews[theme] ? : [UIImage systemImageNamed:@"square.grid.2x2"];
   content.imageProperties.maximumSize = CGSizeMake(44, 44);
   content.imageProperties.reservedLayoutSize = CGSizeMake(44, 44);
   content.imageProperties.tintColor = [UIColor tertiaryLabelColor];
   cell.contentConfiguration = content;
-  cell.accessoryType = (indexPath.section == AVThemeSectionActive) ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+  cell.accessoryType = (indexPath.section == LMThemeSectionActive) ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
   cell.showsReorderControl = YES;
   return cell;
 }
@@ -258,17 +258,17 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
   NSString *theme = [self themeAtIndexPath:indexPath];
   if (!theme) return;
   NSIndexPath *destination;
-  if (indexPath.section == AVThemeSectionActive) {
+  if (indexPath.section == LMThemeSectionActive) {
     [_active removeObjectAtIndex:indexPath.row];
     NSUInteger position = [_installed indexOfObject:theme inSortedRange:NSMakeRange(0, _installed.count) options:NSBinarySearchingInsertionIndex usingComparator:^NSComparisonResult(NSString *a, NSString *b) {
-      return [[AVThemeLibrary displayNameForTheme:a] localizedCaseInsensitiveCompare:[AVThemeLibrary displayNameForTheme:b]];
+      return [[LMThemeLibrary displayNameForTheme:a] localizedCaseInsensitiveCompare:[LMThemeLibrary displayNameForTheme:b]];
     }];
     [_installed insertObject:theme atIndex:position];
-    destination = [NSIndexPath indexPathForRow:position inSection:AVThemeSectionInstalled];
+    destination = [NSIndexPath indexPathForRow:position inSection:LMThemeSectionInstalled];
   } else {
     [_installed removeObjectAtIndex:indexPath.row];
     [_active addObject:theme];
-    destination = [NSIndexPath indexPathForRow:_active.count - 1 inSection:AVThemeSectionActive];
+    destination = [NSIndexPath indexPathForRow:_active.count - 1 inSection:LMThemeSectionActive];
   }
   [tableView performBatchUpdates:^{
     [tableView moveRowAtIndexPath:indexPath toIndexPath:destination];
@@ -279,12 +279,12 @@ static UIImage *AVRenderPreview(NSArray<NSString *> *paths) {
 }
 
 - (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
-  return indexPath.section == AVThemeSectionActive;
+  return indexPath.section == LMThemeSectionActive;
 }
 
 - (NSIndexPath *)tableView:(UITableView *)tableView targetIndexPathForMoveFromRowAtIndexPath:(NSIndexPath *)source toProposedIndexPath:(NSIndexPath *)proposed {
-  if (proposed.section == AVThemeSectionActive) return proposed;
-  return [NSIndexPath indexPathForRow:(_active.count ? _active.count - 1 : 0) inSection:AVThemeSectionActive];
+  if (proposed.section == LMThemeSectionActive) return proposed;
+  return [NSIndexPath indexPathForRow:(_active.count ? _active.count - 1 : 0) inSection:LMThemeSectionActive];
 }
 
 - (void)tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)source toIndexPath:(NSIndexPath *)destination {

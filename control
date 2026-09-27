@@ -1,6 +1,6 @@
-Package: com.xsxs18.avalanche
-Name: Avalanche
-Version: 1.1.0
+Package: com.xsxs18.lumen
+Name: Lumen
+Version: 1.2.0
 Architecture: iphoneos-arm64
 Description: Icon theme engine for iOS 17 - 26. Works with SnowBoard, Anemone and WinterBoard themes.
 Maintainer: xsxs18-dev
@@ -8,4 +8,5 @@ Author: xsxs18-dev
 Section: Tweaks
 Depends: mobilesubstrate, firmware (>= 17.0)
 Provides: com.spark.snowboard, com.anemonetheming.anemone, winterboard
-Conflicts: com.spark.snowboard, com.anemonetheming.anemone, winterboard, com.artikus.neonboard, com.xsxs18.neonboard
+Conflicts: com.spark.snowboard, com.anemonetheming.anemone, winterboard, com.artikus.neonboard, com.xsxs18.neonboard, com.xsxs18.avalanche
+Replaces: com.xsxs18.avalanche

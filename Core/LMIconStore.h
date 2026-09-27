@@ -1,9 +1,9 @@
-#import "../Shared/AVShared.h"
+#import "../Shared/LMShared.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 // IconMap.plist, loaded on first use
-@interface AVIconStore : NSObject
+@interface LMIconStore : NSObject
 
 + (instancetype)sharedStore;
 // nil when the app isn't themed
