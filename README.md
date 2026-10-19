@@ -18,6 +18,8 @@
 - Use several themes at once and drag them into the order you like
 - Theme icons keep their own shape, or use the iOS shape
 - Dark and tinted icons on iOS 18
+- Works on palera1n too: if iconservicesagent renders an icon without the theme, SpringBoard renders it itself
+- Diagnostics page in the settings with a report you can copy
 - App in English and German
 
 ## Supported jailbreaks

@@ -228,10 +228,10 @@ static BOOL LMIconIsCached(ISIcon *icon, NSArray *descriptors) {
   return YES;
 }
 
-// render the icons now so they don't pop in one by one after the respring
-static void LMPrerenderIcons(NSArray<NSString *> *bundleIDs, NSArray *descriptors) {
+// render the icons now so they don't pop in one by one after the respring. Returns how many are ready.
+static uint32_t LMPrerenderIcons(NSArray<NSString *> *bundleIDs, NSArray *descriptors) {
   Class iconClass = objc_getClass("ISIcon");
-  if (!descriptors.count || ![iconClass instancesRespondToSelector:@selector(prepareImagesForImageDescriptors:)] || ![iconClass instancesRespondToSelector:@selector(imageForDescriptor:)]) return;
+  if (!descriptors.count || ![iconClass instancesRespondToSelector:@selector(prepareImagesForImageDescriptors:)] || ![iconClass instancesRespondToSelector:@selector(imageForDescriptor:)]) return 0;
   NSMutableArray *pending = [NSMutableArray new];
   for (NSString *bundleID in bundleIDs) {
     @autoreleasepool {
@@ -256,17 +256,25 @@ static void LMPrerenderIcons(NSArray<NSString *> *bundleIDs, NSArray *descriptor
     lastProgress = CFAbsoluteTimeGetCurrent();
     LMReportProgress(done, total);
   }
+  return done;
 }
 
-static void LMRespring(void) {
+static NSString *LMRespring(void) {
   Class relaunchAction = objc_getClass("SBSRelaunchAction");
   Class systemService = objc_getClass("FBSSystemService");
   if (relaunchAction && systemService) {
     id action = [relaunchAction actionWithReason:@"LumenBoardApply" options:4 targetURL:nil]; // 4: restart render server
     [[systemService sharedService] sendActions:[NSSet setWithObject:action] withResult:nil];
-    return;
+    return @"FrontBoard";
   }
   LMRun(@"/usr/bin/killall", @[@"-9", @"SpringBoard"]);
+  return @"killall";
+}
+
+// Status-Apply.plist for the diagnostics page
+static void LMSaveApplyStatus(NSDictionary *status) {
+  NSData *data = [NSPropertyListSerialization dataWithPropertyList:status format:NSPropertyListBinaryFormat_v1_0 options:0 error:nil];
+  [data writeToFile:LMStatusPath(@"Apply") options:NSDataWritingAtomic error:nil];
 }
 
 static void LMApply(BOOL clearCache) {
@@ -276,11 +284,17 @@ static void LMApply(BOOL clearCache) {
 
   NSDictionary *before = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath][LMMapIcons] ? : @{};
   if (clearCache) LMClearSystemIconCache();
-  LMWriteIconMap();
+  BOOL mapChanged = LMWriteIconMap();
   // reload here now, the other processes get the notification
   LMReloadStoreInThisProcess();
   notify_post(LMNotifyMapChanged);
   NSArray *descriptors = LMHomeScreenDescriptors();
+  NSMutableDictionary *status = [@{
+    @"Date" : [NSDate date],
+    @"ClearCache" : @(clearCache),
+    @"MapChanged" : @(mapChanged),
+    @"Descriptors" : @(descriptors.count),
+  } mutableCopy];
 
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
     LMRestartIconAgent();
@@ -288,9 +302,16 @@ static void LMApply(BOOL clearCache) {
     NSDictionary *after = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath][LMMapIcons] ? : @{};
     // cache was wiped, render everything
     NSArray *apps = clearCache ? LMAppsToRender(nil, nil) : LMAppsToRender(before, after);
-    LMPrerenderIcons(apps, descriptors);
+    status[@"MapIcons"] = @(after.count);
+    status[@"AppsToRender"] = @(apps.count);
+    status[@"Prerendered"] = @(LMPrerenderIcons(apps, descriptors));
     LMReportProgress(UINT32_MAX, UINT32_MAX);
-    dispatch_async(dispatch_get_main_queue(), ^{ LMRespring(); });
+    dispatch_async(dispatch_get_main_queue(), ^{
+      status[@"Respring"] = @"requested";
+      LMSaveApplyStatus(status);
+      status[@"Respring"] = LMRespring();
+      LMSaveApplyStatus(status);
+    });
   });
 }
 

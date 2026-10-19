@@ -1,10 +1,12 @@
 #import "LMSettingsViewController.h"
 #import "LMApplyViewController.h"
+#import "LMDiagnosticsViewController.h"
 #import "LMConfigStore.h"
 
 typedef NS_ENUM(NSInteger, LMSettingsSection) {
   LMSettingsSectionIconStyle,
   LMSettingsSectionIconCache,
+  LMSettingsSectionTroubleshooting,
   LMSettingsSectionAbout,
   LMSettingsSectionCount,
 };
@@ -71,6 +73,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
   switch (section) {
     case LMSettingsSectionIconStyle: return 2;
     case LMSettingsSectionIconCache: return 1;
+    case LMSettingsSectionTroubleshooting: return 1;
     case LMSettingsSectionAbout: return 2;
   }
   return 0;
@@ -80,6 +83,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
   switch (section) {
     case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons");
     case LMSettingsSectionIconCache: return LMLocalized(@"Icon cache");
+    case LMSettingsSectionTroubleshooting: return LMLocalized(@"Troubleshooting");
     case LMSettingsSectionAbout: return LMLocalized(@"About");
   }
   return nil;
@@ -89,6 +93,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
   switch (section) {
     case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Tap Apply afterwards.");
     case LMSettingsSectionIconCache: return LMLocalized(@"Renders every app icon again. Use it if icons still look wrong after installing or updating themes.");
+    case LMSettingsSectionTroubleshooting: return LMLocalized(@"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change.");
   }
   return nil;
 }
@@ -112,6 +117,11 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
     content.textProperties.color = self.view.tintColor;
     content.image = [UIImage systemImageNamed:@"arrow.clockwise"];
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+  } else if (indexPath.section == LMSettingsSectionTroubleshooting) {
+    content.text = LMLocalized(@"Diagnostics");
+    content.image = [UIImage systemImageNamed:@"stethoscope"];
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
   } else if (indexPath.row == 0) {
     content = [UIListContentConfiguration valueCellConfiguration];
     content.text = LMLocalized(@"Version");
@@ -129,6 +139,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
   if (indexPath.section == LMSettingsSectionIconCache) [self confirmClearIconCache];
+  else if (indexPath.section == LMSettingsSectionTroubleshooting) [self.navigationController pushViewController:[LMDiagnosticsViewController new] animated:YES];
 }
 
 @end

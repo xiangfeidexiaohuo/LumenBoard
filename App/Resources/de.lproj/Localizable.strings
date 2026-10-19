@@ -33,3 +33,10 @@
 "Respringing…" = "Respring …";
 "Rendering icons: %u of %u" = "Icons werden gerendert: %u von %u";
 "SpringBoard didn't answer. Make sure LumenBoard is enabled in your tweak injector, respring once and try again." = "SpringBoard hat nicht geantwortet. Prüfe, ob LumenBoard in deinem Tweak-Injector aktiviert ist, mach einen Respring und versuche es erneut.";
+"Troubleshooting" = "Fehlerbehebung";
+"Diagnostics" = "Diagnose";
+"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change." = "Zeigt, was LumenBoard in SpringBoard und iconservicesagent gemacht hat. Kopiere den Bericht, wenn sich deine Icons nicht ändern.";
+"Copy report" = "Bericht kopieren";
+"Loading…" = "Wird geladen …";
+"Report copied" = "Bericht kopiert";
+"Paste it wherever you ask for help." = "Füge ihn dort ein, wo du um Hilfe fragst.";

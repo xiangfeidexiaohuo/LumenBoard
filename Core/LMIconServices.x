@@ -1,11 +1,13 @@
 // Themed icons get their own digest (= icon cache key) in every process,
-// iconservicesagent renders them from the theme png.
+// iconservicesagent renders them from the theme png. When it doesn't (e.g. palera1n), the requesting process renders them itself.
 
 #import "LMIconStore.h"
+#import "LMStatus.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <mach-o/dyld.h>
 #import <dlfcn.h>
+#import <stdatomic.h>
 #import <ImageIO/ImageIO.h>
 #import <CommonCrypto/CommonDigest.h>
 
@@ -39,6 +41,13 @@
 
 @interface IFImage : NSObject
 - (instancetype)initWithCGImage:(CGImageRef)image scale:(double)scale;
+- (NSData *)validationToken;
+@end
+
+@interface ISGenerationRequest : NSObject
+- (void)setIcon:(id)icon;
+- (void)setImageDescriptor:(id)descriptor;
+- (IFImage *)generateImage;
 @end
 
 @interface IFImageBag : NSObject
@@ -62,6 +71,9 @@ static Class LMRecipeClass;
 static NSCache *LMImageBags;
 static NSCache *LMAppURLIdentifiers;
 static char LMIconEntryKey;
+static char LMThemedIconKey;
+// cleared once iconservicesagent hands back a theme icon without the theme, reset when the map changes
+static atomic_bool LMAgentRendersThemes = true;
 
 #pragma mark - Digests
 
@@ -89,6 +101,13 @@ static void LMMarkThemed(ISConcreteIcon *icon, NSString *bundleIdentifier) {
   id stockDigest = object_getIvar(icon, LMDigestIvar);
   if (![stockDigest isKindOfClass:[NSUUID class]]) return;
   object_setIvarWithStrongDefault(icon, LMDigestIvar, LMThemedDigest(stockDigest, entry[LMIconToken]));
+  objc_setAssociatedObject(icon, &LMThemedIconKey, bundleIdentifier, OBJC_ASSOCIATION_COPY_NONATOMIC);
+  LMStatusCount(LMCounterThemedIcons);
+}
+
+// bundle identifier if this process gave the icon a themed digest
+static NSString *LMThemedIconIdentifier(id icon) {
+  return objc_getAssociatedObject(icon, &LMThemedIconKey);
 }
 
 static NSString *LMBundleIdentifierForAppURL(NSURL *url) {
@@ -110,24 +129,37 @@ static NSString *LMBundleIdentifierForIdentity(id identity) {
 
 #pragma mark - Artwork
 
+// largest icon drawn is 83.5 pt @2x / 60 pt @3x, leave room for big App Library and widget sizes
+static const NSUInteger LMMaxArtworkPixels = 512;
+
 static id LMImageBag(NSString *path) {
   if (!path.length) return nil;
   id bag = [LMImageBags objectForKey:path];
   if (bag) return bag;
 
   CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path isDirectory:NO], NULL);
-  CGImageRef image = (source && CGImageSourceGetCount(source)) ? CGImageSourceCreateImageAtIndex(source, 0, NULL) : NULL;
-  if (source) CFRelease(source);
+  if (!source) return nil;
+  NSDictionary *properties = CGImageSourceGetCount(source) ? CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(source, 0, NULL)) : nil;
+  double sourceWidth = [properties[(__bridge id)kCGImagePropertyPixelWidth] doubleValue];
+  // themes often ship 1024 px icons, no icon is drawn that big and SpringBoard / iconservicesagent have little memory to spare
+  NSDictionary *options = @{
+    (__bridge id)kCGImageSourceCreateThumbnailFromImageAlways : @YES,
+    (__bridge id)kCGImageSourceCreateThumbnailWithTransform : @YES,
+    (__bridge id)kCGImageSourceThumbnailMaxPixelSize : @(LMMaxArtworkPixels),
+  };
+  CGImageRef image = sourceWidth ? CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)options) : NULL;
+  CFRelease(source);
   if (!image) return nil;
 
   NSString *name = path.lastPathComponent.lowercaseString;
   double scale = [name containsString:@"@3x"] ? 3.0 : ([name containsString:@"@2x"] ? 2.0 : 1.0);
+  NSUInteger cost = CGImageGetBytesPerRow(image) * CGImageGetHeight(image);
   IFImage *artwork = (CGImageGetWidth(image) && CGImageGetHeight(image)) ? [[objc_getClass("IFImage") alloc] initWithCGImage:image scale:scale] : nil;
   CGImageRelease(image);
   if (!artwork) return nil;
 
   bag = [[objc_getClass("IFImageBag") alloc] initWithImages:@[artwork]];
-  if (bag) [LMImageBags setObject:bag forKey:path];
+  if (bag) [LMImageBags setObject:bag forKey:path cost:cost];
   return bag;
 }
 
@@ -161,6 +193,10 @@ static id LMRecipePrimaryEffect(id self, SEL _cmd, id __autoreleasing *backgroun
 
 static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
   id bag = LMImageBag(entry[LMIconLight]);
+  if (!bag) {
+    LMStatusCount(LMCounterUnreadableImages);
+    if (LMStatusCounterValue(LMCounterUnreadableImages) <= 5) LMStatusEvent(@"can't load %@", entry[LMIconLight]);
+  }
   if (!bag || !LMProviderClass) return nil;
   ISResourceProvider *provider = [[LMProviderClass alloc] initWithResource:bag templateResource:nil];
   if (!provider) return nil;
@@ -173,6 +209,7 @@ static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
   if ([provider respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [provider setAllowAlterationsToResourceArt:YES];
   // only used if the descriptor doesn't ask for a shape itself
   if (!store.usesSystemIconShape && LMRecipeClass && [provider respondsToSelector:@selector(setSuggestedRecipe:)]) [provider setSuggestedRecipe:[LMRecipeClass new]];
+  LMStatusCount(LMCounterProvidersMade);
   return provider;
 }
 
@@ -184,13 +221,130 @@ static ISResourceProvider *LMProviderForRequest(ISConcreteIcon *request, NSStrin
   NSDictionary *entry = [[LMIconStore sharedStore] iconForBundleIdentifier:bundleIdentifier];
   if (!entry) return nil;
   NSUUID *expected = [themedTwin() digest];
-  if (!expected || ![expected isEqual:[request digest]]) return nil;
+  if (!expected || ![expected isEqual:[request digest]]) {
+    LMStatusCount(LMCounterDigestMismatches);
+    if (LMStatusCounterValue(LMCounterDigestMismatches) <= 5) LMStatusEvent(@"stock request for themed app %@", bundleIdentifier);
+    return nil;
+  }
   return LMMakeProvider(entry);
+}
+
+#pragma mark - Rendering in this process
+
+// The theme provider has no LaunchServices resource token, so everything it renders carries IconServices'
+// "always valid" token. A theme icon with any other token was rendered by an iconservicesagent without LumenBoard.
+static BOOL LMRenderedWithTheme(IFImage *image) {
+  static NSData *themeToken;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    SEL validToken = NSSelectorFromString(@"_is_validToken");
+    if ([NSData respondsToSelector:validToken]) themeToken = ((NSData *(*)(Class, SEL))objc_msgSend)([NSData class], validToken);
+  });
+  // can't tell, trust the agent
+  if (!themeToken.length) return image != nil;
+  NSData *token = [image respondsToSelector:@selector(validationToken)] ? [image validationToken] : nil;
+  // the persistent cache keeps 40 bytes of it
+  NSUInteger length = MIN(themeToken.length, (NSUInteger)40);
+  return [token isKindOfClass:[NSData class]] && token.length >= length && !memcmp(token.bytes, themeToken.bytes, length);
+}
+
+static void LMAgentMissedTheme(id icon) {
+  LMStatusCount(LMCounterAgentStock);
+  if (atomic_exchange(&LMAgentRendersThemes, false)) {
+    LMStatusSet(LMStatusAgentRendersThemes, @NO);
+    LMStatusEvent(@"iconservicesagent rendered %@ without the theme, rendering theme icons here", LMThemedIconIdentifier(icon));
+  }
+}
+
+// what iconservicesagent does with a request, done here. The theme provider comes from the hooks below.
+static IFImage *LMRenderHere(ISConcreteIcon *icon, id descriptor) {
+  Class requestClass = objc_getClass("ISGenerationRequest");
+  if (!descriptor || ![requestClass instancesRespondToSelector:@selector(generateImage)]) return nil;
+  // iconservicesagent renders one request at a time, so do we
+  static NSLock *lock;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    lock = [NSLock new];
+  });
+  IFImage *image = nil;
+  [lock lock];
+  @try {
+    ISGenerationRequest *request = [requestClass new];
+    [request setImageDescriptor:descriptor];
+    [request setIcon:icon];
+    image = [request generateImage];
+  } @catch (NSException *exception) {
+    LMStatusEvent(@"rendering %@ failed: %@", LMThemedIconIdentifier(icon), exception.reason);
+  }
+  [lock unlock];
+  if (LMRenderedWithTheme(image)) {
+    LMStatusCount(LMCounterLocalRendered);
+    return image;
+  }
+  LMStatusCount(LMCounterLocalFailed);
+  if (LMStatusCounterValue(LMCounterLocalFailed) <= 5) LMStatusEvent(@"couldn't render %@ with the theme", LMThemedIconIdentifier(icon));
+  return image;
+}
+
+static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
+  // iconservicesagent was restarted with the new map, give it another chance
+  if (!atomic_exchange(&LMAgentRendersThemes, true)) LMStatusSet(LMStatusAgentRendersThemes, @YES);
 }
 
 #pragma mark - Hooks
 
 %group Icons
+
+// requests for icons with a themed digest, made in this process
+%hook ISConcreteIcon
+
+// cached by an iconservicesagent without LumenBoard: the stock icon under the themed digest
+- (id)_imageFromStoreForDescriptor:(id)descriptor {
+  IFImage *image = %orig;
+  if (!image || !LMThemedIconIdentifier(self) || LMRenderedWithTheme(image)) return image;
+  LMAgentMissedTheme(self);
+  return nil;
+}
+
+- (id)generateImageWithDescriptor:(id)descriptor {
+  if (!LMThemedIconIdentifier(self)) return %orig;
+  IFImage *image = nil;
+  if (atomic_load(&LMAgentRendersThemes)) {
+    image = %orig;
+    if (LMRenderedWithTheme(image)) {
+      LMStatusCount(LMCounterAgentThemed);
+      return image;
+    }
+    LMAgentMissedTheme(self);
+  }
+  IFImage *rendered = LMRenderHere(self, descriptor);
+  if (rendered) return rendered;
+  return image ? : %orig;
+}
+
+- (void)generateImageWithDescriptor:(id)descriptor completion:(void (^)(id image))completion {
+  if (!LMThemedIconIdentifier(self) || !completion) {
+    %orig;
+    return;
+  }
+  ISConcreteIcon *icon = self;
+  id request = [descriptor copy];
+  void (^checked)(id) = ^(id image) {
+    if (LMRenderedWithTheme(image)) {
+      LMStatusCount(LMCounterAgentThemed);
+      completion(image);
+      return;
+    }
+    LMAgentMissedTheme(icon);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      IFImage *rendered = LMRenderHere(icon, request);
+      completion(rendered ? : image);
+    });
+  };
+  %orig(descriptor, checked);
+}
+
+%end
 
 %hook ISBundleIdentifierIcon
 
@@ -271,14 +425,22 @@ static void LMInstallIconHooks(void) {
   if (LMHooksInstalled) return;
   Class concreteIcon = objc_getClass("ISConcreteIcon");
   Class providerBase = objc_getClass("ISResourceProvider");
-  if (!concreteIcon || !providerBase || !objc_getClass("ISBundleIdentifierIcon") || !objc_getClass("IFImage") || !objc_getClass("IFImageBag")) return;
+  if (!concreteIcon) return;
+  if (!providerBase || !objc_getClass("ISBundleIdentifierIcon") || !objc_getClass("IFImage") || !objc_getClass("IFImageBag")) {
+    LMStatusEvent(@"IconServices classes missing, icons stay stock");
+    return;
+  }
   // no _digest, no way to keep themed and stock icons apart
   Ivar digest = class_getInstanceVariable(concreteIcon, "_digest");
-  if (!digest || ![providerBase instancesRespondToSelector:@selector(initWithResource:templateResource:)]) return;
+  if (!digest || ![providerBase instancesRespondToSelector:@selector(initWithResource:templateResource:)]) {
+    LMStatusEvent(@"ISConcreteIcon has no _digest, icons stay stock");
+    return;
+  }
   LMHooksInstalled = YES;
   LMDigestIvar = digest;
   LMImageBags = [NSCache new];
   LMImageBags.countLimit = 300;
+  LMImageBags.totalCostLimit = 48 * 1024 * 1024;
   LMAppURLIdentifiers = [NSCache new];
 
   Class provider = LMSubclass(providerBase, "LMThemeIconProvider");
@@ -299,6 +461,9 @@ static void LMInstallIconHooks(void) {
   LMRecipeClass = recipe;
 
   %init(Icons);
+  CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, LMMapDidChange, CFSTR(LMNotifyMapChanged), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+  LMStatusSet(LMStatusHooksInstalled, @YES);
+  if (![[NSProcessInfo processInfo].processName isEqualToString:@"iconservicesagent"]) LMStatusSet(LMStatusAgentRendersThemes, @YES);
 }
 
 static void LMImageAdded(const struct mach_header *header, intptr_t slide) {
@@ -312,6 +477,8 @@ static void LMImageAdded(const struct mach_header *header, intptr_t slide) {
 %ctor {
   @autoreleasepool {
     if (![[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){17, 0, 0}]) return;
+    LMStatusSet(LMStatusLoaded, [NSDate date]);
+    LMStatusSet(LMStatusHooksInstalled, @NO);
     LMInstallIconHooks();
     if (!LMHooksInstalled) _dyld_register_func_for_add_image(LMImageAdded);
   }

@@ -63,3 +63,13 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMIconTinted @"Tinted"
 #define LMIconToken @"Token" // changes whenever the icon or the settings change
 #define LMMapAppliedConfig @"AppliedConfig"
+
+// Status-<name>.plist: what the tweak did in SpringBoard, in iconservicesagent and on the last apply. Shown on the diagnostics page.
+#define LMStatusPath(name) [LMDataDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"Status-%@.plist", name]]
+#define LMStatusLoaded @"Loaded"
+#define LMStatusUpdated @"Updated"
+#define LMStatusHooksInstalled @"HooksInstalled"
+#define LMStatusAgentRendersThemes @"AgentRendersThemes" // NO: SpringBoard renders the theme icons itself
+#define LMStatusMapIcons @"MapIcons"
+#define LMStatusCounters @"Counters"
+#define LMStatusEvents @"Events"
