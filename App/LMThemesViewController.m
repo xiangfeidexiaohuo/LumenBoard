@@ -3,6 +3,8 @@
 #import "LMApplyViewController.h"
 #import "LMConfigStore.h"
 #import "../Shared/LMThemeLibrary.h"
+#import <ImageIO/ImageIO.h>
+#include <sys/stat.h>
 
 typedef NS_ENUM(NSInteger, LMThemeSection) {
   LMThemeSectionActive,
@@ -15,6 +17,35 @@ static NSArray<NSString *> *LMPreviewApps(void) {
            @"com.apple.mobileslideshow", @"com.apple.preferences", @"com.apple.appstore", @"com.apple.mobilemail"];
 }
 
+// decodes only what the preview needs, theme icons are often 1024 px
+static UIImage *LMThumbnail(NSString *path, CGFloat pixels) {
+  CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path isDirectory:NO], NULL);
+  if (!source) return nil;
+  NSDictionary *options = @{
+    (__bridge id)kCGImageSourceCreateThumbnailFromImageAlways : @YES,
+    (__bridge id)kCGImageSourceCreateThumbnailWithTransform : @YES,
+    (__bridge id)kCGImageSourceThumbnailMaxPixelSize : @(pixels),
+  };
+  CGImageRef image = CGImageSourceGetCount(source) ? CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)options) : NULL;
+  CFRelease(source);
+  if (!image) return nil;
+  UIImage *thumbnail = [UIImage imageWithCGImage:image];
+  CGImageRelease(image);
+  return thumbnail;
+}
+
+// changes when the theme is reinstalled or icons are added or removed
+static NSString *LMThemeStamp(NSString *theme) {
+  NSString *directory = [LMThemesDirectory stringByAppendingPathComponent:theme];
+  NSMutableString *stamp = [NSMutableString new];
+  for (NSString *folder in @[@"", @"IconBundles", @"Icons"]) {
+    struct stat info;
+    if (stat([directory stringByAppendingPathComponent:folder].fileSystemRepresentation, &info) == 0) [stamp appendFormat:@"%lld.%ld/", (long long)info.st_mtimespec.tv_sec, info.st_mtimespec.tv_nsec];
+    else [stamp appendString:@"-/"];
+  }
+  return stamp;
+}
+
 static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   if (!paths.count) return nil;
   const CGFloat side = 44, gap = 3;
@@ -23,7 +54,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
     NSUInteger count = MIN(paths.count, (NSUInteger)4);
     CGFloat tile = (count == 1) ? side : (side - gap) / 2;
     for (NSUInteger index = 0; index < count; index++) {
-      UIImage *icon = [[UIImage imageWithContentsOfFile:paths[index]] imageByPreparingThumbnailOfSize:CGSizeMake(tile * 3, tile * 3)];
+      UIImage *icon = LMThumbnail(paths[index], tile * 3);
       if (!icon) continue;
       CGRect rect = (count == 1) ? CGRectMake(0, 0, side, side) : CGRectMake((index % 2) * (tile + gap), (index / 2) * (tile + gap), tile, tile);
       CGContextSaveGState(context.CGContext);
@@ -37,9 +68,10 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 @implementation LMThemesViewController {
   NSMutableArray<NSString *> *_active;
   NSMutableArray<NSString *> *_installed;
-  NSMutableDictionary<NSString *, UIImage *> *_previews;
-  NSMutableDictionary<NSString *, NSNumber *> *_iconCounts;
+  // theme -> preview, icon count and the stamp they were loaded with
+  NSMutableDictionary<NSString *, NSDictionary *> *_details;
   NSMutableSet<NSString *> *_loading;
+  dispatch_queue_t _detailsQueue;
   UIButton *_applyButton;
 }
 
@@ -50,9 +82,11 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.title = @"LumenBoard";
-  _previews = [NSMutableDictionary new];
-  _iconCounts = [NSMutableDictionary new];
+  _details = [NSMutableDictionary new];
   _loading = [NSMutableSet new];
+  // one theme at a time, so the visible ones are done first
+  _detailsQueue = dispatch_queue_create("com.xsxs18.lumenboard.theme-details", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, 0));
+  [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"Theme"];
   self.tableView.rowHeight = 64;
   self.tableView.allowsSelectionDuringEditing = YES;
 
@@ -96,9 +130,9 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   _active = active;
   _installed = [installed mutableCopy];
   [_installed removeObjectsInArray:active];
-  [_previews removeAllObjects];
-  [_iconCounts removeAllObjects];
-  [_loading removeAllObjects];
+  // keep the previews of themes whose files didn't change
+  for (NSString *theme in _details.allKeys)
+    if (![installed containsObject:theme] || ![_details[theme][@"Stamp"] isEqualToString:LMThemeStamp(theme)]) [_details removeObjectForKey:theme];
   // themes that were uninstalled drop out of the configuration
   if (![active isEqualToArray:[LMConfigStore sharedStore].enabledThemes]) [self saveActiveThemes];
 
@@ -127,9 +161,10 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 }
 
 - (void)loadDetailsForTheme:(NSString *)theme {
-  if ([_loading containsObject:theme]) return;
+  if (!theme || [_loading containsObject:theme]) return;
   [_loading addObject:theme];
-  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+  dispatch_async(_detailsQueue, ^{
+    NSString *stamp = LMThemeStamp(theme);
     NSDictionary *icons = [LMThemeLibrary iconsInTheme:theme];
     NSMutableArray *paths = [NSMutableArray new];
     for (NSString *bundleID in LMPreviewApps()) {
@@ -141,15 +176,19 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
       NSString *path = icons[bundleID][LMIconLight];
       if (path && ![paths containsObject:path]) [paths addObject:path];
     }
-    UIImage *preview = LMRenderPreview(paths);
-    NSUInteger count = icons.count + [LMThemeLibrary iconsByAppNameInTheme:theme].count;
+    NSMutableDictionary *details = [NSMutableDictionary new];
+    details[@"Stamp"] = stamp;
+    details[@"Count"] = @(icons.count + [LMThemeLibrary iconsByAppNameInTheme:theme].count);
+    details[@"Preview"] = LMRenderPreview(paths);
     dispatch_async(dispatch_get_main_queue(), ^{
-      if (preview) self->_previews[theme] = preview;
-      self->_iconCounts[theme] = @(count);
-      NSMutableArray *indexPaths = [NSMutableArray new];
-      for (NSIndexPath *indexPath in self.tableView.indexPathsForVisibleRows)
-        if ([[self themeAtIndexPath:indexPath] isEqualToString:theme]) [indexPaths addObject:indexPath];
-      if (indexPaths.count) [self.tableView reconfigureRowsAtIndexPaths:indexPaths];
+      [self->_loading removeObject:theme];
+      self->_details[theme] = details;
+      // update the cell on screen itself, a dequeued cell would be a different one
+      for (NSIndexPath *indexPath in self.tableView.indexPathsForVisibleRows) {
+        if (![[self themeAtIndexPath:indexPath] isEqualToString:theme]) continue;
+        UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
+        if (cell) [self configureCell:cell atIndexPath:indexPath];
+      }
     });
   });
 }
@@ -232,24 +271,28 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   return _installed.count ? nil : LMLocalized(@"All installed themes are active.");
 }
 
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-  UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Theme"] ? : [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"Theme"];
+- (void)configureCell:(UITableViewCell *)cell atIndexPath:(NSIndexPath *)indexPath {
   NSString *theme = [self themeAtIndexPath:indexPath];
-  NSNumber *count = _iconCounts[theme];
-  if (!count || !_previews[theme]) [self loadDetailsForTheme:theme];
+  NSDictionary *details = theme ? _details[theme] : nil;
+  if (!details) [self loadDetailsForTheme:theme];
 
   UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
-  content.text = [LMThemeLibrary displayNameForTheme:theme];
+  content.text = theme ? [LMThemeLibrary displayNameForTheme:theme] : nil;
   content.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
-  content.secondaryText = count ? [NSString localizedStringWithFormat:LMLocalized(@"%lu icons"), (unsigned long)count.unsignedIntegerValue] : @" ";
+  content.secondaryText = details ? [NSString localizedStringWithFormat:LMLocalized(@"%lu icons"), (unsigned long)[details[@"Count"] unsignedIntegerValue]] : @" ";
   content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
-  content.image = _previews[theme] ? : [UIImage systemImageNamed:@"square.grid.2x2"];
+  content.image = details[@"Preview"] ? : [UIImage systemImageNamed:@"square.grid.2x2"];
   content.imageProperties.maximumSize = CGSizeMake(44, 44);
   content.imageProperties.reservedLayoutSize = CGSizeMake(44, 44);
   content.imageProperties.tintColor = [UIColor tertiaryLabelColor];
   cell.contentConfiguration = content;
   cell.accessoryType = (indexPath.section == LMThemeSectionActive) ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
   cell.showsReorderControl = YES;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+  UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Theme" forIndexPath:indexPath];
+  [self configureCell:cell atIndexPath:indexPath];
   return cell;
 }
 
