@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3
+- Fixed themes randomly showing "0 icons" and no preview, for example while your package manager is still installing themes
+- Themes that change while LumenBoard is open (installed, updated, removed) are picked up right away
+- Pull down on the theme list to read every theme again
+- A theme that can't be read now says so instead of showing "0 icons"
+- Diagnostics list every installed theme, with details for themes that have no icons
+
 ## 1.0.2
 - Fixed theme previews and icon counts not showing when many themes are installed
 - Theme previews load faster and use less memory

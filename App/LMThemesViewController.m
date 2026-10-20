@@ -47,15 +47,19 @@ static NSString *LMThemeStamp(NSString *theme) {
 }
 
 static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
-  if (!paths.count) return nil;
   const CGFloat side = 44, gap = 3;
+  NSUInteger count = MIN(paths.count, (NSUInteger)4);
+  CGFloat tile = (count == 1) ? side : (side - gap) / 2;
+  NSMutableArray<UIImage *> *icons = [NSMutableArray new];
+  for (NSUInteger index = 0; index < count; index++) {
+    UIImage *icon = LMThumbnail(paths[index], tile * 3);
+    if (icon) [icons addObject:icon];
+  }
+  if (!icons.count) return nil;
   UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side)];
   return [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
-    NSUInteger count = MIN(paths.count, (NSUInteger)4);
-    CGFloat tile = (count == 1) ? side : (side - gap) / 2;
-    for (NSUInteger index = 0; index < count; index++) {
-      UIImage *icon = LMThumbnail(paths[index], tile * 3);
-      if (!icon) continue;
+    for (NSUInteger index = 0; index < icons.count; index++) {
+      UIImage *icon = icons[index];
       CGRect rect = (count == 1) ? CGRectMake(0, 0, side, side) : CGRectMake((index % 2) * (tile + gap), (index / 2) * (tile + gap), tile, tile);
       CGContextSaveGState(context.CGContext);
       [[UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:tile * 0.225] addClip];
@@ -72,6 +76,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   NSMutableDictionary<NSString *, NSDictionary *> *_details;
   NSMutableSet<NSString *> *_loading;
   dispatch_queue_t _detailsQueue;
+  NSTimer *_changeTimer;
   UIButton *_applyButton;
 }
 
@@ -108,9 +113,25 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   self.toolbarItems = @[space, [[UIBarButtonItem alloc] initWithCustomView:_applyButton], space];
 
   self.refreshControl = [UIRefreshControl new];
-  [self.refreshControl addTarget:self action:@selector(reloadThemes) forControlEvents:UIControlEventValueChanged];
+  [self.refreshControl addTarget:self action:@selector(refresh) forControlEvents:UIControlEventValueChanged];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(reloadThemes) name:UIApplicationWillEnterForegroundNotification object:nil];
   [self reloadThemes];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+  // the package manager may still be installing themes in the background
+  [_changeTimer invalidate];
+  __weak typeof(self) weakSelf = self;
+  _changeTimer = [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
+    [weakSelf checkForThemeChanges];
+  }];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+  [super viewDidDisappear:animated];
+  [_changeTimer invalidate];
+  _changeTimer = nil;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -130,9 +151,9 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   _active = active;
   _installed = [installed mutableCopy];
   [_installed removeObjectsInArray:active];
-  // keep the previews of themes whose files didn't change
+  // keep the previews of themes whose files didn't change, try the ones that couldn't be read again
   for (NSString *theme in _details.allKeys)
-    if (![installed containsObject:theme] || ![_details[theme][@"Stamp"] isEqualToString:LMThemeStamp(theme)]) [_details removeObjectForKey:theme];
+    if (![installed containsObject:theme] || _details[theme][@"Error"] || ![_details[theme][@"Stamp"] isEqualToString:LMThemeStamp(theme)]) [_details removeObjectForKey:theme];
   // themes that were uninstalled drop out of the configuration
   if (![active isEqualToArray:[LMConfigStore sharedStore].enabledThemes]) [self saveActiveThemes];
 
@@ -140,6 +161,32 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   [self.tableView reloadData];
   [self updateEmptyState];
   [self updateApplyButton];
+}
+
+// pull to refresh: read every theme again
+- (void)refresh {
+  [_details removeAllObjects];
+  [self reloadThemes];
+}
+
+- (void)checkForThemeChanges {
+  if (self.tableView.isEditing) return;
+  NSMutableSet *known = [NSMutableSet setWithArray:_active];
+  [known addObjectsFromArray:_installed];
+  if (![[NSSet setWithArray:[LMThemeLibrary installedThemes]] isEqualToSet:known]) {
+    [self reloadThemes];
+    return;
+  }
+  // icons added or removed since the preview was made
+  for (NSIndexPath *indexPath in self.tableView.indexPathsForVisibleRows) {
+    NSString *theme = [self themeAtIndexPath:indexPath];
+    NSDictionary *details = theme ? _details[theme] : nil;
+    if (!details || [details[@"Stamp"] isEqualToString:LMThemeStamp(theme)]) continue;
+    [_details removeObjectForKey:theme];
+    [LMThemeLibrary invalidateTheme:theme];
+    UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
+    if (cell) [self configureCell:cell atIndexPath:indexPath];
+  }
 }
 
 - (NSString *)themeAtIndexPath:(NSIndexPath *)indexPath {
@@ -179,6 +226,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
     NSMutableDictionary *details = [NSMutableDictionary new];
     details[@"Stamp"] = stamp;
     details[@"Count"] = @(icons.count + [LMThemeLibrary iconsByAppNameInTheme:theme].count);
+    details[@"Error"] = [LMThemeLibrary readErrorForTheme:theme];
     details[@"Preview"] = LMRenderPreview(paths);
     dispatch_async(dispatch_get_main_queue(), ^{
       [self->_loading removeObject:theme];
@@ -279,7 +327,9 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
   content.text = theme ? [LMThemeLibrary displayNameForTheme:theme] : nil;
   content.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
-  content.secondaryText = details ? [NSString localizedStringWithFormat:LMLocalized(@"%lu icons"), (unsigned long)[details[@"Count"] unsignedIntegerValue]] : @" ";
+  if (details[@"Error"]) content.secondaryText = LMLocalized(@"Couldn't read this theme, pull down to try again");
+  else if (details) content.secondaryText = [NSString localizedStringWithFormat:LMLocalized(@"%lu icons"), (unsigned long)[details[@"Count"] unsignedIntegerValue]];
+  else content.secondaryText = LMLocalized(@"Loading…");
   content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
   content.image = details[@"Preview"] ? : [UIImage systemImageNamed:@"square.grid.2x2"];
   content.imageProperties.maximumSize = CGSizeMake(44, 44);

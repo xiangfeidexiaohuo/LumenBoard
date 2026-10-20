@@ -48,6 +48,22 @@ static NSString *LMTweakLoaderName(void) {
   return loaders.count ? [loaders componentsJoinedByString:@", "] : @"none found";
 }
 
+// what's really in a theme folder, for themes that come out with no icons
+static NSString *LMFolderSummary(NSString *path) {
+  struct stat info;
+  if (lstat(path.fileSystemRepresentation, &info) != 0) return [NSString stringWithFormat:@"missing (%s)", strerror(errno)];
+  NSString *kind = S_ISDIR(info.st_mode) ? @"folder" : @"file";
+  if (S_ISLNK(info.st_mode)) kind = [NSString stringWithFormat:@"symlink to %@", [[NSFileManager defaultManager] destinationOfSymbolicLinkAtPath:path error:nil] ? : @"?"];
+  NSError *error;
+  NSArray *entries = [[[NSFileManager defaultManager] contentsOfDirectoryAtPath:path error:&error] sortedArrayUsingSelector:@selector(compare:)];
+  NSString *contents = error.localizedDescription ? : @"-";
+  if (entries) {
+    NSUInteger pngs = [entries filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"pathExtension ==[c] 'png'"]].count;
+    contents = [NSString stringWithFormat:@"%lu entries, %lu png: %@", (unsigned long)entries.count, (unsigned long)pngs, [[entries subarrayWithRange:NSMakeRange(0, MIN(entries.count, (NSUInteger)4))] componentsJoinedByString:@", "]];
+  }
+  return [NSString stringWithFormat:@"%@ %o uid %d, %@", kind, (int)(info.st_mode & 07777), (int)info.st_uid, contents];
+}
+
 static NSDictionary *LMStatus(NSString *name) {
   NSDictionary *status = [NSDictionary dictionaryWithContentsOfFile:LMStatusPath(name)];
   return [status isKindOfClass:[NSDictionary class]] ? status : nil;
@@ -119,9 +135,19 @@ static NSString *LMDiagnosticsReport(void) {
   LMConfigStore *config = [LMConfigStore sharedStore];
   [LMThemeLibrary invalidate];
   NSArray *installed = [LMThemeLibrary installedThemes];
-  [report appendFormat:@"\nThemes in %@: %lu installed, %lu active\n", LMThemesDirectory, (unsigned long)installed.count, (unsigned long)config.enabledThemes.count];
-  for (NSString *theme in config.enabledThemes)
-    [report appendFormat:@"  %@: %lu by bundle id, %lu by app name%@\n", theme, (unsigned long)[LMThemeLibrary iconsInTheme:theme].count, (unsigned long)[LMThemeLibrary iconsByAppNameInTheme:theme].count, [installed containsObject:theme] ? @"" : @" (not installed)"];
+  [report appendFormat:@"\nThemes in %@: %lu installed, %lu active (*)\n", LMThemesDirectory, (unsigned long)installed.count, (unsigned long)config.enabledThemes.count];
+  NSMutableArray *themes = [installed mutableCopy];
+  for (NSString *theme in config.enabledThemes) if (![themes containsObject:theme]) [themes addObject:theme];
+  for (NSString *theme in themes) {
+    NSUInteger byBundleID = [LMThemeLibrary iconsInTheme:theme].count, byName = [LMThemeLibrary iconsByAppNameInTheme:theme].count;
+    NSString *error = [LMThemeLibrary readErrorForTheme:theme];
+    NSString *state = ![installed containsObject:theme] ? @" (not installed)" : (error ? [NSString stringWithFormat:@" (%@)", error] : @"");
+    [report appendFormat:@"  %@%@: %lu by bundle id, %lu by app name%@\n", [config.enabledThemes containsObject:theme] ? @"* " : @"", theme, (unsigned long)byBundleID, (unsigned long)byName, state];
+    if (byBundleID + byName || ![installed containsObject:theme]) continue;
+    NSString *directory = [LMThemesDirectory stringByAppendingPathComponent:theme];
+    [report appendFormat:@"      theme: %@\n", LMFolderSummary(directory)];
+    for (NSString *folder in @[@"IconBundles", @"Icons"]) [report appendFormat:@"      %@: %@\n", folder, LMFolderSummary([directory stringByAppendingPathComponent:folder])];
+  }
   [report appendFormat:@"  iOS icon shape: %@, keep in dark & tinted: %@\n", LMYesNo(config.useSystemIconShape), LMYesNo(config.keepIconsInDarkAndTinted)];
 
   // icon map
