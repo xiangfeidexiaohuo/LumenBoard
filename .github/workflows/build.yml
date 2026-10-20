@@ -61,8 +61,10 @@ jobs:
           VERSION: ${{ steps.package.outputs.version }}
         run: |
           tag="v$VERSION"
-          notes=$(printf 'Rootless (Dopamine, palera1n): %s\nRootHide (Relaxin, Bootstrap, Dopamine-roothide): %s\n\nBuild %s' \
-            "$(cd packages && ls *_iphoneos-arm64.deb)" "$(cd packages && ls *_iphoneos-arm64e.deb)" "${GITHUB_SHA::7}")
+          # this version's section of CHANGELOG.md
+          changes=$(awk -v version="$VERSION" '/^## /{ found = ($2 == version); next } found' CHANGELOG.md | sed '/^$/d')
+          notes=$(printf '%s\n\nRootless (Dopamine, palera1n): %s\nRootHide (Relaxin, Bootstrap, Dopamine-roothide): %s\n\nBuild %s' \
+            "$changes" "$(cd packages && ls *_iphoneos-arm64.deb)" "$(cd packages && ls *_iphoneos-arm64e.deb)" "${GITHUB_SHA::7}")
           git tag -f "$tag" "$GITHUB_SHA"
           git push -f origin "refs/tags/$tag"
           if gh release view "$tag" > /dev/null 2>&1; then
